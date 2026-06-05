@@ -4,7 +4,9 @@ import pandas as pd
 # Para trabajar con tablas de datos.
 # Se usa para limpiar, filtrar, seleccionar y sumar medicamentos.
 
-# original            from app.cargar_datos import cargar_medicamentos
+# Import para cuando el proyecto se ejecute como paquete completo
+# from app.cargar_datos import cargar_medicamentos
+# Import temporal para pruebas locales
 from cargar_datos import cargar_medicamentos
 # Importa la función creada en cargar_datos.py.
 # Esa función carga la base de medicamentos desde la URL oficial de PAMI
