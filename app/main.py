@@ -72,39 +72,85 @@
 
 # 3. PRUEBA DE ANÁLISIS_GASTO.PY
 
-import pandas as pd
-from analisis_gasto import armar_analisis_completo
+#import pandas as pd
+#from analisis_gasto import armar_analisis_completo
 
-print("1. Iniciando prueba del módulo análisis de gasto...\n")
+#print("1. Iniciando prueba del módulo análisis de gasto...\n")
 
-try:
+#try:
     # Simular medicamentos seleccionados
-    medicamentos_seleccionados = pd.DataFrame({"DROGA": ["AMLODIPINA", "LOSARTAN", "LEVOTIROXINA"],
-                                               "MARCA": ["MEDICAMENTO A", "MEDICAMENTO B", "MEDICAMENTO C"],
-                                               "A_PAGAR": [5000, 7500, 0]})
+#    medicamentos_seleccionados = pd.DataFrame({"DROGA": ["AMLODIPINA", "LOSARTAN", "LEVOTIROXINA"],
+#                                               "MARCA": ["MEDICAMENTO A", "MEDICAMENTO B", "MEDICAMENTO C"],
+#                                               "A_PAGAR": [5000, 7500, 0]})
 
     # Simular ingreso jubilatorio ingresado por el usuario
-    ingreso_jubilatorio = 437000
+#    ingreso_jubilatorio = 437000
 
     # Ejecutar análisis completo
-    resultado = armar_analisis_completo(ingreso_jubilatorio,
-                                        medicamentos_seleccionados)
+#    resultado = armar_analisis_completo(ingreso_jubilatorio,
+#                                        medicamentos_seleccionados)
 
     # Mostrar resultados
-    print("2. Análisis realizado correctamente.\n")
+#    print("2. Análisis realizado correctamente.\n")
 
-    print("Resumen:")
-    print(resultado["resumen"])
+#    print("Resumen:")
+#    print(resultado["resumen"])
 
-    print("\nTabla resumen:")
-    print(resultado["tabla_resumen"])
+#    print("\nTabla resumen:")
+#    print(resultado["tabla_resumen"])
 
-    print("\nMensaje para el usuario:")
-    print(resultado["mensaje"])
+#    print("\nMensaje para el usuario:")
+#    print(resultado["mensaje"])
 
     # Mostrar gráfico
-    resultado["grafico"].show()
+#    resultado["grafico"].show()
+
+#except Exception as error:
+#    print("Ocurrió un error durante la prueba.")
+#    print(error)
+
+
+# 4. PRUEBA DEL MÓDULO PDF_GENERADO
+
+import pandas as pd
+from pdf_generado import generar_pdf_resumen
+
+print("1. Iniciando prueba del módulo PDF...\n")
+
+try:
+    # 1. Simular resumen economico
+    resumen = {"Ingreso_Jubilatorio": 437000,
+               "Cantidad_Medicamentos": 3,
+               "Gasto_Total_Medicamentos": 12500,
+               "Saldo_Restante": 424500,
+               "Porcentaje_Gasto_Medicamentos": 2.86}
+
+    print("2. Resumen económico generado.")
+
+    # 2. Simular medicamentos seleccionados
+    df_medicamentos = pd.DataFrame({"DROGA": ["AMLODIPINA","LOSARTAN","LEVOTIROXINA"],
+                                    "MARCA": ["MEDICAMENTO A","MEDICAMENTO B","MEDICAMENTO C"],
+                                    "COBERTURA": ["80%","50%","100%"],
+                                    "A_PAGAR": [5000,7500,0]})
+
+    print("3. Tabla de medicamentos creada.")
+
+    # 3. Simular agencias seleccionadas
+    df_agencias = pd.DataFrame({"Nombre_Agencia": ["AGENCIA ADROGUE","AGENCIA LOMAS DE ZAMORA"],
+                                "Domicilio": ["Av. Espora 123","Hipolito Yrigoyen 456"],
+                                "Localidad": ["ADROGUE","LOMAS DE ZAMORA"],
+                                "Provincia": ["BUENOS AIRES","BUENOS AIRES"]})
+
+    print("4. Tabla de agencias creada.")
+
+    # 4. Generar PDF
+    ruta_pdf = generar_pdf_resumen(resumen,df_medicamentos,df_agencias)
+
+    print("\n5. PDF generado correctamente.")
+    print("Ubicación del archivo:")
+    print(ruta_pdf)
 
 except Exception as error:
-    print("Ocurrió un error durante la prueba.")
+
+    print("\nOcurrió un error durante la prueba.")
     print(error)
