@@ -1,11 +1,19 @@
-# 1. IMPORTACIÓN DE LIBRERÍAS
+# 1. IMPORTACIÓN DE LIBRERÍAS Y FUNCIONES NECESARIAS
 
 import pandas as pd
 # Para trabajar con tablas de datos.
-# Para ordenar la información del resumen económico.
+# Se usa para ordenar la información del resumen económico.
 
 import matplotlib.pyplot as plt
 # Para generar el gráfico de barra horizontal apilada.
+
+try:
+    from app.beneficios import generar_alertas_beneficios, crear_mensaje_alertas
+except ModuleNotFoundError:
+    from beneficios import generar_alertas_beneficios, crear_mensaje_alertas
+# Importa las funciones del módulo beneficios.py.
+# El try/except permite que funcione tanto cuando se ejecuta el proyecto completo
+# como cuando se prueba localmente desde app/main.py.
 
 
 # 2. CÁLCULO DEL RESUMEN ECONÓMICO
@@ -37,6 +45,7 @@ def calcular_resumen_gasto(ingreso_jubilatorio, df_medicamentos_seleccionados):
     # c. Si hay medicamentos seleccionados, se suma la columna A_PAGAR
     else:
         cantidad_medicamentos = len(df_medicamentos_seleccionados)
+
         if "A_PAGAR" in df_medicamentos_seleccionados.columns:
             gasto_total = df_medicamentos_seleccionados["A_PAGAR"].sum()
         else:
@@ -99,15 +108,17 @@ def formatear_pesos(valor):
 
 def crear_mensaje_resumen(resumen):
     """
-    Crea un mensaje simple para explicar el resultado al usuario.
+    Crea un mensaje simple para explicar el resultado económico al usuario.
     """
 
+    # a. Tomar valores del resumen
     ingreso = formatear_pesos(resumen["Ingreso_Jubilatorio"])
     gasto = formatear_pesos(resumen["Gasto_Total_Medicamentos"])
     saldo = formatear_pesos(resumen["Saldo_Restante"])
     porcentaje = resumen["Porcentaje_Gasto_Medicamentos"]
     cantidad = resumen["Cantidad_Medicamentos"]
 
+    # b. Crear mensaje en lenguaje simple
     mensaje = (f"Su ingreso jubilatorio informado es de {ingreso}. "
                f"El gasto total estimado en {cantidad} medicamento/s es de {gasto}. "
                f"Después de pagar esos medicamentos, le quedarían aproximadamente {saldo}. "
@@ -134,7 +145,7 @@ def generar_grafico_gasto(resumen):
     saldo_restante = resumen["Saldo_Restante"]
     cantidad_medicamentos = resumen["Cantidad_Medicamentos"]
 
-    # b. Crear figura
+    # b. Crear figura y eje
     fig, ax = plt.subplots(figsize=(10, 2.5))
 
     # c. Graficar el gasto en medicamentos
@@ -163,7 +174,10 @@ def generar_grafico_gasto(resumen):
 
 # 7. ARMAR RESULTADO FINAL DEL ANÁLISIS
 
-def armar_analisis_completo(ingreso_jubilatorio, df_medicamentos_seleccionados):
+def armar_analisis_completo(ingreso_jubilatorio,
+                            df_medicamentos_seleccionados,
+                            enfermedad_seleccionada="Ninguna",
+                            incluye_bono=True):
     """
     Ejecuta todo el análisis de gasto en medicamentos.
 
@@ -171,7 +185,8 @@ def armar_analisis_completo(ingreso_jubilatorio, df_medicamentos_seleccionados):
         - cálculo del resumen económico;
         - creación de tabla;
         - creación del mensaje explicativo;
-        - generación del gráfico.
+        - generación del gráfico;
+        - evaluación de posibles beneficios o trámites a consultar.
 
     Es la función principal que luego usará Streamlit.
     """
@@ -183,16 +198,28 @@ def armar_analisis_completo(ingreso_jubilatorio, df_medicamentos_seleccionados):
     # b. Crear tabla resumen
     tabla_resumen = crear_tabla_resumen_gasto(resumen)
 
-    # c. Crear mensaje explicativo
+    # c. Crear mensaje económico principal
     mensaje = crear_mensaje_resumen(resumen)
 
     # d. Crear gráfico
     grafico = generar_grafico_gasto(resumen)
 
-    # e. Devolver todos los resultados juntos
+    # e. Generar alertas de beneficios
+    alertas_beneficios = generar_alertas_beneficios(ingreso_jubilatorio=ingreso_jubilatorio,
+                                                    resumen_gasto=resumen,
+                                                    df_medicamentos_seleccionados=df_medicamentos_seleccionados,
+                                                    enfermedad_seleccionada=enfermedad_seleccionada,
+                                                    incluye_bono=incluye_bono)
+
+    # f. Convertir alertas en un mensaje final
+    mensaje_beneficios = crear_mensaje_alertas(alertas_beneficios)
+
+    # g. Devolver todos los resultados juntos
     resultado = {"resumen": resumen,
                  "tabla_resumen": tabla_resumen,
                  "mensaje": mensaje,
-                 "grafico": grafico}
+                 "grafico": grafico,
+                 "alertas_beneficios": alertas_beneficios,
+                 "mensaje_beneficios": mensaje_beneficios}
 
     return resultado
