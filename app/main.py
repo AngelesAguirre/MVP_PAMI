@@ -112,43 +112,135 @@
 
 # 4. PRUEBA DEL MÓDULO PDF_GENERADO
 
-import pandas as pd
-from pdf_generado import generar_pdf_resumen
+#import pandas as pd
+#from pdf_generado import generar_pdf_resumen
 
-print("1. Iniciando prueba del módulo PDF...\n")
+#print("1. Iniciando prueba del módulo PDF...\n")
 
-try:
+#try:
     # 1. Simular resumen economico
-    resumen = {"Ingreso_Jubilatorio": 437000,
-               "Cantidad_Medicamentos": 3,
-               "Gasto_Total_Medicamentos": 12500,
-               "Saldo_Restante": 424500,
-               "Porcentaje_Gasto_Medicamentos": 2.86}
+#    resumen = {"Ingreso_Jubilatorio": 437000,
+#               "Cantidad_Medicamentos": 3,
+#               "Gasto_Total_Medicamentos": 12500,
+#               "Saldo_Restante": 424500,
+#               "Porcentaje_Gasto_Medicamentos": 2.86}
 
-    print("2. Resumen económico generado.")
+#    print("2. Resumen económico generado.")
 
     # 2. Simular medicamentos seleccionados
-    df_medicamentos = pd.DataFrame({"DROGA": ["AMLODIPINA","LOSARTAN","LEVOTIROXINA"],
-                                    "MARCA": ["MEDICAMENTO A","MEDICAMENTO B","MEDICAMENTO C"],
-                                    "COBERTURA": ["80%","50%","100%"],
-                                    "A_PAGAR": [5000,7500,0]})
+#    df_medicamentos = pd.DataFrame({"DROGA": ["AMLODIPINA","LOSARTAN","LEVOTIROXINA"],
+#                                    "MARCA": ["MEDICAMENTO A","MEDICAMENTO B","MEDICAMENTO C"],
+#                                    "COBERTURA": ["80%","50%","100%"],
+#                                    "A_PAGAR": [5000,7500,0]})
 
-    print("3. Tabla de medicamentos creada.")
+#    print("3. Tabla de medicamentos creada.")
 
     # 3. Simular agencias seleccionadas
+#    df_agencias = pd.DataFrame({"Nombre_Agencia": ["AGENCIA ADROGUE","AGENCIA LOMAS DE ZAMORA"],
+#                                "Domicilio": ["Av. Espora 123","Hipolito Yrigoyen 456"],
+#                                "Localidad": ["ADROGUE","LOMAS DE ZAMORA"],
+#                                "Provincia": ["BUENOS AIRES","BUENOS AIRES"]})
+
+#    print("4. Tabla de agencias creada.")
+
+    # 4. Generar PDF
+#    ruta_pdf = generar_pdf_resumen(resumen,df_medicamentos,df_agencias)
+
+#    print("\n5. PDF generado correctamente.")
+#    print("Ubicación del archivo:")
+#    print(ruta_pdf)
+
+#except Exception as error:
+
+#    print("\nOcurrió un error durante la prueba.")
+#    print(error)
+
+
+# 5. PRUEBA DE BENEFICIOS + ANÁLISIS DE GASTO + PDF
+
+import pandas as pd
+
+from analisis_gasto import armar_analisis_completo
+from pdf_generado import generar_pdf_resumen
+
+print("1. Iniciando prueba de analisis_gasto.py con beneficios.py...\n")
+
+try:
+
+    # 1. SIMULAR MEDICAMENTOS SELECCIONADOS
+    medicamentos_seleccionados = pd.DataFrame({"DROGA": ["AMLODIPINA","VALSARTAN","ROSUVASTATINA","METFORMINA","INSULINA"],
+                                               "MARCA": ["MEDICAMENTO A","MEDICAMENTO B","MEDICAMENTO C","MEDICAMENTO D","MEDICAMENTO E"],
+                                               "PRESENTACION": ["10 MG","80 MG","10 MG","850 MG","100 UI"],
+                                               "LABORATORIO": ["LAB A","LAB B","LAB C","LAB D","LAB E"],
+                                               "COBERTURA": ["50%","50%","50%","100%","100%"],
+                                               "A_PAGAR": [8000,9500,6000,0,0]})
+
+    print("2. Medicamentos simulados creados correctamente.")
+    print(medicamentos_seleccionados)
+
+
+    # 2. SIMULAR INGRESO DEL USUARIO
+    ingreso_jubilatorio = 437000
+    enfermedad_seleccionada = "Diabetes"
+    incluye_bono = True
+
+    print("\n3. Datos del usuario simulados:")
+    print("Ingreso jubilatorio:", ingreso_jubilatorio)
+    print("Enfermedad seleccionada:", enfermedad_seleccionada)
+    print("Incluye bono:", incluye_bono)
+
+    # 3. EJECUTAR ANÁLISIS COMPLETO
+    resultado = armar_analisis_completo(ingreso_jubilatorio=ingreso_jubilatorio,
+                                        df_medicamentos_seleccionados=medicamentos_seleccionados,
+                                        enfermedad_seleccionada=enfermedad_seleccionada,
+                                        incluye_bono=incluye_bono)
+
+    print("\n4. Análisis ejecutado correctamente.")
+
+    # 4. MOSTRAR RESUMEN ECONÓMICO
+    print("\n5. Resumen económico:")
+    print(resultado["resumen"])
+
+    print("\n6. Tabla resumen:")
+    print(resultado["tabla_resumen"])
+
+    print("\n7. Mensaje económico:")
+    print(resultado["mensaje"])
+
+    # 5. MOSTRAR ALERTAS DE BENEFICIOS
+    print("\n8. Alertas detectadas:")
+
+    for alerta in resultado["alertas_beneficios"]:
+        print("-" * 60)
+        print("Tipo:", alerta["tipo"])
+        print("Aplica:", alerta["aplica"])
+        print("Mensaje:", alerta["mensaje"])
+
+    print("\n9. Mensaje final de beneficios:")
+    print(resultado["mensaje_beneficios"])
+
+    # 6. SIMULAR AGENCIAS SELECCIONADAS
     df_agencias = pd.DataFrame({"Nombre_Agencia": ["AGENCIA ADROGUE","AGENCIA LOMAS DE ZAMORA"],
                                 "Domicilio": ["Av. Espora 123","Hipolito Yrigoyen 456"],
                                 "Localidad": ["ADROGUE","LOMAS DE ZAMORA"],
                                 "Provincia": ["BUENOS AIRES","BUENOS AIRES"]})
 
-    print("4. Tabla de agencias creada.")
+    print("\n10. Tabla de agencias creada correctamente.")
 
-    # 4. Generar PDF
-    ruta_pdf = generar_pdf_resumen(resumen,df_medicamentos,df_agencias)
+    # 7. GENERAR PDF
+    ruta_pdf = generar_pdf_resumen(resumen=resultado["resumen"],
+                                   df_medicamentos=medicamentos_seleccionados,
+                                   df_agencias=df_agencias,
+                                   mensaje_beneficios=resultado["mensaje_beneficios"],
+                                   enfermedad_seleccionada=enfermedad_seleccionada,
+                                   nombre_archivo="resumen_pami_prueba.pdf")
 
-    print("\n5. PDF generado correctamente.")
-    print("Ubicación del archivo:")
+    print("\n11. PDF generado correctamente.")
+    print("Ubicación:")
     print(ruta_pdf)
+
+    # 8. MOSTRAR GRÁFICO
+    resultado["grafico"].show()
 
 except Exception as error:
 
