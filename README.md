@@ -27,7 +27,7 @@ Actualmente el sistema permite:
 
 - Buscar medicamentos del vademécum oficial de PAMI.
 - Agregar múltiples medicamentos a una consulta.
-- Calcular automáticamente el gasto total mensual.
+- Calcular automáticamente el gasto total mensual en base a los precios actualizados del mercado.
 - Calcular el porcentaje del ingreso destinado a medicamentos.
 - Seleccionar enfermedades con posible cobertura especial.
 - Detectar posibles beneficios de PAMI según la situación del afiliado.
@@ -51,6 +51,7 @@ El proyecto se encuentra organizado de manera modular.
 | `pdf_generado.py` | Construcción del informe PDF para el usuario. |
 | `streamlit_app.py` | Interfaz gráfica del sistema. |
 | `cargar_datos.py` | Carga y administración de datasets. |
+| `scraping_precios_actualizados.py` | Comapracion de precios de medicamentos entre el dataset oficial de Pami y el de mercado. |
 
 ---
 
@@ -67,8 +68,6 @@ La aplicación utiliza información proveniente de organismos oficiales.
 Además, se encuentra prevista la incorporación de:
 
 - Scraping de jubilación mínima desde fuentes oficiales.
-- Scraping de precios actualizados de medicamentos desde farmacias.
-
 ---
 
 # Tecnologías utilizadas
@@ -81,6 +80,7 @@ Además, se encuentra prevista la incorporación de:
 - GitHub
 - Open Data PAMI
 - INDEC
+- Scraping
 
 ---
 
@@ -95,7 +95,7 @@ Además, se encuentra prevista la incorporación de:
 | Generación de PDF | Finalizado |
 | Aplicación Streamlit | En desarrollo avanzado |
 | Scraping de jubilación mínima | Pendiente |
-| Scraping de precios de medicamentos | Pendiente |
+| Scraping de precios de medicamentos | Finalizado |
 
 ---
 
@@ -104,10 +104,6 @@ Además, se encuentra prevista la incorporación de:
 Entre las funcionalidades previstas para futuras versiones se encuentran:
 
 - Incorporación de scraping automático de jubilación mínima.
-- Actualización automática de precios de medicamentos.
-- Comparación entre precio PAMI y precio de mercado.
-- Mejora del buscador inteligente de medicamentos.
-- Optimización de la interfaz para personas mayores.
 - Publicación online mediante Streamlit Cloud.
 
 ---
