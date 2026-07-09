@@ -53,6 +53,15 @@ from analisis_gasto import armar_analisis_completo
 
 from pdf_generado import generar_pdf_resumen
 
+from scraping_precios_actualizados import actualizar_precio_con_web
+# actualizar_precio_con_web compara, para UN medicamento, el precio PAMI
+# del dataset contra el precio PAMI actualizado en
+# preciosdemedicamentos.com.ar, y deja en A_PAGAR el valor más alto.
+# Se aplica en el momento en que el usuario agrega el medicamento,
+# para que la tabla de "Medicamentos seleccionados" ya muestre
+# directamente el precio final (no hace falta una segunda tabla
+# comparativa más adelante).
+
 
 # ==========================================================
 # 4. CONFIGURACIÓN GENERAL DE LA PÁGINA
@@ -360,6 +369,12 @@ if busqueda:
 
         if st.button("Agregar medicamento"):
             medicamento = opciones.iloc[indice_medicamento].to_dict()
+
+            with st.spinner("Consultando precio actualizado en la web..."):
+                medicamento = actualizar_precio_con_web(medicamento)
+            # Desde acá en adelante, A_PAGAR ya es el mayor entre el
+            # precio del dataset PAMI y el precio actualizado de la web.
+
             st.session_state.medicamentos_seleccionados.append(medicamento)
             st.success("Medicamento agregado correctamente.")
 
@@ -548,6 +563,11 @@ if st.button("Generar análisis"):
         st.error("Debe seleccionar agencias PAMI.")
 
     else:
+
+        # df_meds_seleccionados ya tiene el precio final en A_PAGAR
+        # (el mayor entre dataset PAMI y web), porque esa comparación
+        # se hace al momento de apretar "Agregar medicamento".
+
         resultado = armar_analisis_completo(ingreso_jubilatorio=ingreso_jubilatorio,
                                             df_medicamentos_seleccionados=df_meds_seleccionados,
                                             enfermedad_seleccionada=enfermedad_seleccionada,
@@ -555,7 +575,7 @@ if st.button("Generar análisis"):
 
         st.subheader("Resumen económico")
         st.write(resultado["mensaje"])
-        st.dataframe(resultado["tabla_resumen"])
+        st.dataframe(resultado["tabla_resumen"],hide_index=True)
 
         st.subheader("Gráfico del ingreso")
 
@@ -571,9 +591,36 @@ if st.button("Generar análisis"):
         else:
             porcentaje_gasto = 0
 
-        st.progress(
-            porcentaje_gasto,
-            text=f"Medicamentos ({cantidad}): ${gasto:,.2f} | Saldo restante: ${saldo:,.2f}")
+        # Se limita entre 0 y 1 para que la barra no se rompa visualmente
+        # si el gasto llegara a superar el ingreso informado.
+        porcentaje_gasto_barra = max(0, min(porcentaje_gasto, 1))
+
+        st.markdown(
+            f"""
+            <div style="
+                background-color:#FFB100;
+                border-radius:10px;
+                height:38px;
+                width:100%;
+                overflow:hidden;
+                margin-top:0.4rem;
+                margin-bottom:0.6rem;">
+                <div style="
+                    background-color:#005CA8;
+                    height:100%;
+                    width:{porcentaje_gasto_barra * 100}%;
+                    border-radius:10px 0 0 10px;">
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.write(
+            f"Medicamentos ({cantidad}): ${gasto:,.2f}  |  "
+            f"Saldo restante: ${saldo:,.2f}  |  "
+            f"{porcentaje_gasto * 100:.2f}% del ingreso"
+        )
 
         st.subheader("Posibles beneficios o trámites a consultar")
         st.write(resultado["mensaje_beneficios"])

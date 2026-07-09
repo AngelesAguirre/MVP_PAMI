@@ -8,11 +8,16 @@ import unicodedata
 # Permite normalizar texto.
 # En este caso lo usamos para quitar acentos y tildes.
 
-# Import para cuando el proyecto se ejecute como paquete completo
-# from app.cargar_datos import cargar_medicamentos
+# Import para cargar la base de medicamentos.
+# El try/except permite que funcione tanto:
+# - cuando ejecutamos Streamlit desde la raíz del proyecto;
+# - como cuando probamos módulos desde la carpeta app.
 
-# Import temporal para pruebas locales
-from cargar_datos import cargar_medicamentos
+try:
+    from app.cargar_datos import cargar_medicamentos
+except ModuleNotFoundError:
+    from cargar_datos import cargar_medicamentos
+
 # Importa la función creada en cargar_datos.py.
 # Esa función carga la base de medicamentos desde la URL oficial de PAMI o desde el archivo local de respaldo si la URL falla.
 

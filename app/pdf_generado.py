@@ -18,8 +18,26 @@ PDF_DIR = BASE_DIR / "pdfs"
 PDF_DIR.mkdir(exist_ok=True)
 # Crea la carpeta pdfs si todavía no existe.
 
+# Ruta del logo institucional (el mismo que se usa en el sistema de Streamlit).
+# Si en tu proyecto el logo está guardado en otra carpeta (por ejemplo dentro
+# de "assets/" o "static/"), actualizá esta linea con la ruta correcta.
+LOGO_PATH = BASE_DIR / "logo_PAMI.png"
 
-# 3. FUNCIONES AUXILIARES
+
+# 3. PALETA DE COLORES INSTITUCIONAL PAMI
+# Estos son los únicos colores que se usan en todo el documento, tomados
+# directamente del sitio oficial de PAMI.
+
+COLOR_NAVY = (11, 35, 68)        # Azul oscuro institucional
+COLOR_SLATE = (69, 101, 141)     # Azul grisáceo
+COLOR_ORANGE = (248, 149, 29)    # Naranja
+COLOR_TEAL = (80, 184, 177)      # Verde azulado
+COLOR_PURPLE = (145, 110, 175)   # Violeta
+COLOR_WHITE = (255, 255, 255)
+COLOR_BLACK = (0, 0, 0)
+
+
+# 4. FUNCIONES AUXILIARES
 
 def limpiar_texto_pdf(texto):
     """
@@ -49,7 +67,7 @@ def formatear_pesos(valor):
     return f"${valor:,.2f}"
 
 
-# 4. CLASE PERSONALIZADA DEL PDF
+# 5. CLASE PERSONALIZADA DEL PDF
 
 class PDFResumenPAMI(FPDF):
     """
@@ -58,16 +76,40 @@ class PDFResumenPAMI(FPDF):
 
     def header(self):
         """
-        Encabezado automático de cada página.
+        Encabezado automático de cada página: logo institucional centrado,
+        título del sistema y subtítulo "Resumen de Consulta".
         """
 
-        self.set_font("Arial", "B", 16)
-        self.cell(0, 10, "Resumen de Consulta PAMI", ln=True, align="C")
+        y_actual = 8
 
-        self.set_font("Arial", "", 11)
-        self.cell(0,8,"Sistema de apoyo para jubilados y pensionados",ln=True,align="C")
+        # Logo centrado en la parte superior de la hoja.
+        if LOGO_PATH.exists():
+            ancho_logo = 26
+            x_centro = (self.w - ancho_logo) / 2
+            self.image(str(LOGO_PATH), x=x_centro, y=y_actual, w=ancho_logo)
+            self.set_y(y_actual + ancho_logo + 2)
+        else:
+            self.set_y(y_actual)
 
-        self.ln(8)
+        # Título principal (igual al del sistema de Streamlit).
+        self.set_font("Arial", "B", 17)
+        self.set_text_color(*COLOR_NAVY)
+        self.cell(0, 8, limpiar_texto_pdf("Sistema de Orientacion sobre Medicamentos"),
+                  ln=True, align="C")
+
+        # Subtítulo.
+        self.set_font("Arial", "", 12)
+        self.set_text_color(*COLOR_SLATE)
+        self.cell(0, 7, limpiar_texto_pdf("Resumen de Consulta"), ln=True, align="C")
+
+        # Línea decorativa debajo del encabezado.
+        self.set_draw_color(*COLOR_ORANGE)
+        self.set_line_width(0.8)
+        y_linea = self.get_y() + 2
+        self.line(self.l_margin, y_linea, self.w - self.r_margin, y_linea)
+
+        self.set_text_color(*COLOR_BLACK)
+        self.set_y(y_linea + 6)
 
     def footer(self):
         """
@@ -75,21 +117,57 @@ class PDFResumenPAMI(FPDF):
         """
 
         self.set_y(-15)
+
+        self.set_draw_color(*COLOR_ORANGE)
+        self.set_line_width(0.5)
+        self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
+
         self.set_font("Arial", "I", 8)
+        self.set_text_color(*COLOR_SLATE)
         self.cell(0, 10, f"Pagina {self.page_no()}", align="C")
+        self.set_text_color(*COLOR_BLACK)
 
 
-# 5. AGREGAR RESUMEN ECONÓMICO
+# 6. TÍTULO DE SECCIÓN (estilo institucional, sin numeración)
+
+def agregar_titulo_seccion(pdf, texto):
+    """
+    Agrega un título de sección destacado: fondo de color, tipografía en
+    negrita y mayúscula, con las letras en azul institucional.
+    """
+
+    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
+    alto = 9
+
+    x = pdf.l_margin
+    y = pdf.get_y()
+
+    # Fondo en contraste con el color del texto.
+    pdf.set_fill_color(*COLOR_TEAL)
+    pdf.rect(x, y, ancho_util, alto, style="F")
+
+    # Texto en azul institucional, en negrita y mayúscula.
+    pdf.set_xy(x, y)
+    pdf.set_font("Arial", "B", 13)
+    pdf.set_text_color(*COLOR_NAVY)
+    pdf.cell(ancho_util, alto, limpiar_texto_pdf(texto.upper()), align="C")
+
+    pdf.set_text_color(*COLOR_BLACK)
+    pdf.set_xy(x, y + alto)
+    pdf.ln(4)
+
+
+# 7. AGREGAR RESUMEN ECONÓMICO
 
 def agregar_resumen_economico(pdf, resumen):
     """
     Agrega ingreso, gasto, saldo y porcentaje al PDF.
     """
 
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, "1. Resumen economico", ln=True)
+    agregar_titulo_seccion(pdf, "Resumen economico")
 
     pdf.set_font("Arial", "", 11)
+    pdf.set_text_color(*COLOR_BLACK)
 
     ingreso = formatear_pesos(resumen["Ingreso_Jubilatorio"])
     gasto = formatear_pesos(resumen["Gasto_Total_Medicamentos"])
@@ -100,36 +178,51 @@ def agregar_resumen_economico(pdf, resumen):
     pdf.cell(0, 8, f"Ingreso jubilatorio informado: {ingreso}", ln=True)
     pdf.cell(0, 8, f"Cantidad de medicamentos seleccionados: {cantidad}", ln=True)
     pdf.cell(0, 8, f"Gasto total estimado en medicamentos: {gasto}", ln=True)
+
+    # El saldo restante se destaca en azul institucional y negrita.
+    pdf.set_font("Arial", "B", 11)
+    pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(0, 8, f"Saldo restante luego de pagar medicamentos: {saldo}", ln=True)
+
+    pdf.set_font("Arial", "", 11)
+    pdf.set_text_color(*COLOR_BLACK)
     pdf.cell(0, 8, f"Porcentaje del ingreso destinado a medicamentos: {porcentaje:.2f}%", ln=True)
 
     pdf.ln(6)
 
 
-# 6. AGREGAR MEDICAMENTOS
+# 8. AGREGAR MEDICAMENTOS
 
 def agregar_medicamentos(pdf, df_medicamentos):
     """
-    Agrega tabla de medicamentos seleccionados.
+    Agrega tabla de medicamentos seleccionados. La primera fila (encabezado)
+    tiene fondo de color, texto centrado, en negrita y en mayúscula.
     """
 
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, "2. Medicamentos seleccionados", ln=True)
+    agregar_titulo_seccion(pdf, "Medicamentos seleccionados")
 
     if df_medicamentos.empty:
         pdf.set_font("Arial", "", 11)
+        pdf.set_text_color(*COLOR_BLACK)
         pdf.cell(0, 8, "No se seleccionaron medicamentos.", ln=True)
         pdf.ln(6)
         return
 
+    anchos = [45, 50, 35, 40]
+    encabezados = ["DROGA", "MARCA", "COBERTURA", "A PAGAR"]
+
+    # Encabezado de la tabla: fondo de color, texto centrado, negrita y mayúscula.
     pdf.set_font("Arial", "B", 9)
+    pdf.set_fill_color(*COLOR_NAVY)
+    pdf.set_text_color(*COLOR_WHITE)
 
-    pdf.cell(45, 8, "Droga", border=1)
-    pdf.cell(50, 8, "Marca", border=1)
-    pdf.cell(35, 8, "Cobertura", border=1)
-    pdf.cell(40, 8, "A pagar", border=1, ln=True)
+    for ancho, titulo in zip(anchos, encabezados):
+        pdf.cell(ancho, 9, titulo, border=1, align="C", fill=True)
+    pdf.ln()
 
+    # Filas de datos.
     pdf.set_font("Arial", "", 8)
+    pdf.set_text_color(*COLOR_BLACK)
 
     for _, fila in df_medicamentos.iterrows():
         droga = limpiar_texto_pdf(fila.get("DROGA", ""))[:25]
@@ -139,46 +232,89 @@ def agregar_medicamentos(pdf, df_medicamentos):
 
         pdf.cell(45, 8, droga, border=1)
         pdf.cell(50, 8, marca, border=1)
-        pdf.cell(35, 8, cobertura, border=1)
-        pdf.cell(40, 8, a_pagar, border=1, ln=True)
+        pdf.cell(35, 8, cobertura, border=1, align="C")
+        pdf.cell(40, 8, a_pagar, border=1, align="R")
+        pdf.ln()
 
     pdf.ln(6)
 
 
-# 7. AGREGAR AGENCIAS
+# 9. AGREGAR AGENCIAS (en dos columnas para aprovechar el espacio)
 
 def agregar_agencias(pdf, df_agencias):
     """
-    Agrega agencias PAMI seleccionadas o sugeridas.
+    Agrega las agencias PAMI seleccionadas distribuidas en dos columnas
+    (una al lado de la otra) para no desperdiciar espacio en la hoja.
     """
 
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, "3. Agencias PAMI seleccionadas", ln=True)
+    agregar_titulo_seccion(pdf, "Agencias PAMI seleccionadas")
 
     if df_agencias.empty:
         pdf.set_font("Arial", "", 11)
+        pdf.set_text_color(*COLOR_BLACK)
         pdf.cell(0, 8, "No se seleccionaron agencias.", ln=True)
         pdf.ln(6)
         return
 
-    for indice, fila in df_agencias.iterrows():
-        nombre = limpiar_texto_pdf(fila.get("Nombre_Agencia", ""))
-        domicilio = limpiar_texto_pdf(fila.get("Domicilio", ""))
-        localidad = limpiar_texto_pdf(fila.get("Localidad", ""))
-        provincia = limpiar_texto_pdf(fila.get("Provincia", ""))
+    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
+    espacio_entre_columnas = 6
+    ancho_columna = (ancho_util - espacio_entre_columnas) / 2
 
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, f"Agencia {indice + 1}: {nombre}", ln=True)
+    x_columna_izquierda = pdf.l_margin
+    x_columna_derecha = pdf.l_margin + ancho_columna + espacio_entre_columnas
 
-        pdf.set_font("Arial", "", 10)
-        pdf.cell(0, 7, f"Domicilio: {domicilio}", ln=True)
-        pdf.cell(0, 7, f"Localidad: {localidad}", ln=True)
-        pdf.cell(0, 7, f"Provincia: {provincia}", ln=True)
+    filas = list(df_agencias.iterrows())
 
-        pdf.ln(3)
+    # Se procesan las agencias de a pares (una fila de tarjetas por par).
+    for inicio_par in range(0, len(filas), 2):
+        par = filas[inicio_par:inicio_par + 2]
+        y_inicio_fila = pdf.get_y()
+        y_maximo = y_inicio_fila
+
+        for posicion, (indice, fila) in enumerate(par):
+            x = x_columna_izquierda if posicion == 0 else x_columna_derecha
+
+            nombre = limpiar_texto_pdf(fila.get("Nombre_Agencia", ""))
+            domicilio = limpiar_texto_pdf(fila.get("Domicilio", ""))
+            localidad = limpiar_texto_pdf(fila.get("Localidad", ""))
+            provincia = limpiar_texto_pdf(fila.get("Provincia", ""))
+
+            # Encabezado de la tarjeta de agencia.
+            pdf.set_xy(x, y_inicio_fila)
+            pdf.set_fill_color(*COLOR_SLATE)
+            pdf.set_text_color(*COLOR_WHITE)
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(ancho_columna, 8, f"AGENCIA {inicio_par + posicion + 1}",
+                     border=0, align="C", fill=True)
+
+            # Nombre de la agencia.
+            pdf.set_xy(x, y_inicio_fila + 8)
+            pdf.set_text_color(*COLOR_NAVY)
+            pdf.set_font("Arial", "B", 10)
+            pdf.multi_cell(ancho_columna, 6, nombre)
+
+            # Datos de contacto.
+            pdf.set_text_color(*COLOR_BLACK)
+            pdf.set_font("Arial", "", 9)
+
+            pdf.set_x(x)
+            pdf.multi_cell(ancho_columna, 5.5, f"Domicilio: {domicilio}")
+
+            pdf.set_x(x)
+            pdf.multi_cell(ancho_columna, 5.5, f"Localidad: {localidad}")
+
+            pdf.set_x(x)
+            pdf.multi_cell(ancho_columna, 5.5, f"Provincia: {provincia}")
+
+            if pdf.get_y() > y_maximo:
+                y_maximo = pdf.get_y()
+
+        pdf.set_xy(pdf.l_margin, y_maximo + 4)
+
+    pdf.ln(4)
 
 
-# 8. AGREGAR BENEFICIOS Y TRÁMITES
+# 10. AGREGAR BENEFICIOS Y TRÁMITES
 
 def agregar_beneficios(pdf, mensaje_beneficios=None, enfermedad_seleccionada="Ninguna"):
     """
@@ -191,14 +327,14 @@ def agregar_beneficios(pdf, mensaje_beneficios=None, enfermedad_seleccionada="Ni
         Enfermedad indicada por el usuario en el sistema.
     """
 
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, "4. Posibles beneficios y tramites a consultar", ln=True)
+    agregar_titulo_seccion(pdf, "Posibles beneficios y tramites a consultar")
 
     pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(*COLOR_BLACK)
 
     enfermedad = limpiar_texto_pdf(enfermedad_seleccionada)
 
-    pdf.multi_cell(0,7,f"Enfermedad o condicion informada por el usuario: {enfermedad}")
+    pdf.multi_cell(0, 7, f"Enfermedad o condicion informada por el usuario: {enfermedad}")
 
     pdf.ln(2)
 
@@ -212,17 +348,17 @@ def agregar_beneficios(pdf, mensaje_beneficios=None, enfermedad_seleccionada="Ni
     pdf.ln(6)
 
 
-# 9. AGREGAR MENSAJE FINAL
+# 11. AGREGAR MENSAJE FINAL
 
 def agregar_mensaje_final(pdf):
     """
     Agrega aclaración general final.
     """
 
-    pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 10, "5. Informacion importante", ln=True)
+    agregar_titulo_seccion(pdf, "Informacion importante")
 
     pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(*COLOR_BLACK)
 
     texto = (
         "Este resumen es orientativo. Los valores pueden variar segun la actualizacion de precios, la "
@@ -233,7 +369,7 @@ def agregar_mensaje_final(pdf):
     pdf.multi_cell(0, 7, limpiar_texto_pdf(texto))
 
 
-# 10. GENERAR PDF FINAL
+# 12. GENERAR PDF FINAL
 
 def generar_pdf_resumen(resumen,
                         df_medicamentos,
