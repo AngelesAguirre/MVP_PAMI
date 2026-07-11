@@ -64,6 +64,20 @@ from scraping_precios_actualizados import actualizar_precio_con_web
 
 
 # ==========================================================
+# 3.1. PALETA DE COLORES INSTITUCIONAL PAMI
+# Estos son los únicos colores que se usan en todo el sistema, tomados
+# directamente del sitio oficial de PAMI. Se dejan como variables para
+# no repetir códigos hexadecimales sueltos a lo largo del archivo.
+
+COLOR_NAVY = "#0B2344"     # Azul oscuro institucional
+COLOR_SLATE = "#45658D"    # Azul grisáceo
+COLOR_ORANGE = "#F8951D"   # Naranja
+COLOR_TEAL = "#50B8B1"     # Verde azulado
+COLOR_PURPLE = "#916EAF"   # Violeta
+COLOR_WHITE = "#FFFFFF"
+
+
+# ==========================================================
 # 4. CONFIGURACIÓN GENERAL DE LA PÁGINA
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -100,133 +114,190 @@ def mostrar_logo_centrado(ruta_logo, ancho=240):
 
 mostrar_logo_centrado(LOGO_PAMI)
 
+
+# 4.2. TABLAS HTML DESTACADAS (Medicamentos seleccionados / Agencias seleccionadas / Resumen económico)
+
+def formatear_numeros_tabla(df):
+    """
+    Da formato a los valores numéricos de una tabla antes de mostrarla:
+    - Si el número es entero (por ejemplo 3.0 o 373000.0), se muestra sin decimales.
+    - Si el número tiene parte decimal, se muestra con exactamente 2 decimales.
+    Los valores que no son numéricos (texto) se dejan tal cual.
+    """
+
+    df_formateado = df.copy()
+
+    def formatear_valor(valor):
+        if pd.isna(valor):
+            return valor
+        try:
+            valor_float = float(valor)
+        except (TypeError, ValueError):
+            return valor
+
+        if valor_float == int(valor_float):
+            return f"{int(valor_float)}"
+        else:
+            return f"{valor_float:.2f}"
+
+    for columna in df_formateado.columns:
+        if pd.api.types.is_numeric_dtype(df_formateado[columna]):
+            df_formateado[columna] = df_formateado[columna].apply(formatear_valor)
+
+    return df_formateado
+
+
+def mostrar_tabla_destacada(df):
+    """
+    Muestra un DataFrame como tabla HTML con el encabezado (primera fila)
+    destacado: fondo de color institucional, texto en negrita y en
+    mayúscula. Se usa para las tablas de "Medicamentos seleccionados",
+    "Agencias seleccionadas" y "Resumen económico", que son las que el
+    usuario necesita leer con más claridad.
+    """
+
+    df_formateado = formatear_numeros_tabla(df)
+
+    html_tabla = df_formateado.to_html(index=False, classes="tabla-destacada", border=0, escape=True)
+
+    st.markdown(
+        f'<div class="tabla-destacada-wrapper">{html_tabla}</div>',
+        unsafe_allow_html=True
+    )
+
+
 # ==========================================================
 # 5. ESTILO VISUAL INSTITUCIONAL
 
 st.markdown(
-    """
+    f"""
     <style>
 
     /* Fondo general */
-    .stApp {
-    background-color:#FFFFFF;
-    color:#061A40;}
+    .stApp {{
+    background-color:{COLOR_WHITE};
+    color:{COLOR_NAVY};}}
 
     /* Contenedor principal */
-    .block-container{
+    .block-container{{
     padding-top:2rem;
     padding-bottom:3rem;
-    max-width:1250px;}
+    max-width:1250px;}}
 
     /* Logo */
-    .logo-container{
+    .logo-container{{
         display:flex;
         justify-content:center;
         align-items:center;
         margin-top:1rem;
-        margin-bottom:1.2rem;}
+        margin-bottom:1.2rem;}}
 
     /* Título principal del sistema */
-    div.titulo-sistema{
-        color:#061A40 !important;
+    div.titulo-sistema{{
+        color:{COLOR_NAVY} !important;
         font-size:50px !important;
         font-weight:900 !important;
         text-align:center !important;
         line-height:1.15;
         margin-top:1rem;
-        margin-bottom:2rem;}
+        margin-bottom:2rem;}}
 
     /* Títulos propios de cada sección */
-    .titulo-seccion{
-        color:#061A40 !important;
+    .titulo-seccion{{
+        color:{COLOR_NAVY} !important;
         font-size:32px !important;
         font-weight:850 !important;
         line-height:1.25;
         margin-top:2.8rem;
-        margin-bottom:1.2rem;}
+        margin-bottom:1.2rem;}}
 
     /* Texto general */
     p,
     label,
-    span{
-        font-size:20px !important;}
+    span{{
+        font-size:20px !important;}}
 
     /* Etiquetas */
-    label{
+    label{{
         font-size:20px !important;
         font-weight:700 !important;
-        color:#061A40 !important;
-    }
+        color:{COLOR_NAVY} !important;
+    }}
 
     /* Inputs y selectores */
     input,
     textarea,
-    select{
-        font-size:18px !important;}
+    select{{
+        font-size:18px !important;}}
 
     /* Texto mostrado dentro de los selectbox de Streamlit */
-    div[data-baseweb="select"] span{
+    div[data-baseweb="select"] span{{
         font-size:18px !important;
-        font-weight:500 !important;}
+        font-weight:500 !important;}}
 
     /* Opciones del menú desplegable */
-    div[role="option"]{
+    div[role="option"]{{
         font-size:22px !important;
-    }
+    }}
 
-    input[type="number"]{
+    input[type="number"]{{
         font-size:20px !important;
-        font-weight:600 !important;}
+        font-weight:600 !important;}}
 
     /* Botones */
-    div.stButton>button{
-        background:#005CA8;
-        color:white;
+    div.stButton>button{{
+        background:{COLOR_SLATE};
+        color:{COLOR_WHITE};
         font-size:17px;
         font-weight:750;
         height:2.6em;
         padding:0.35rem 1.2rem;
         border:none;
         border-radius:9px;
-    }
+    }}
 
-    div.stButton>button:hover{
-        background:#003B73;
-        color:white;
-    }
+    div.stButton>button:hover{{
+        background:{COLOR_NAVY};
+        color:{COLOR_WHITE};
+    }}
 
-    div.stDownloadButton>button{
-        background:#00A6D6;
-        color:white;
+    div.stDownloadButton>button{{
+        background:{COLOR_TEAL};
+        color:{COLOR_WHITE};
         font-size:17px;
         font-weight:750;
         height:2.6em;
         padding:0.35rem 1.2rem;
         border:none;
         border-radius:9px;
-    }
+    }}
+
+    div.stDownloadButton>button:hover{{
+        background:{COLOR_NAVY};
+        color:{COLOR_WHITE};
+    }}
 
     /* Alertas */
-    div[data-testid="stAlert"]{
+    div[data-testid="stAlert"]{{
         font-size:16px !important;
         border-radius:8px;
         padding:0.35rem 0.75rem;
-    }
+    }}
 
-    div[data-testid="stAlert"] p{
+    div[data-testid="stAlert"] p{{
         font-size:16px !important;
         line-height:1.35 !important;
-    }
+    }}
 
-    /* Tablas */
-    div[data-testid="stDataFrame"]{
-        font-size:20px;
-    }
+    /* Tablas nativas de Streamlit (st.dataframe) */
+    div[data-testid="stDataFrame"]{{
+        font-size:21px;
+    }}
 
     /* Caja azul */
-    .caja-presentacion{
-        background:#005CA8;
-        color:white;
+    .caja-presentacion{{
+        background:{COLOR_NAVY};
+        color:{COLOR_WHITE};
         padding:2.3rem 2.5rem;
         border-radius:14px;
         margin-top:2rem;
@@ -235,13 +306,57 @@ st.markdown(
         line-height:1.8;
         font-size:23px;
         font-weight:500;
-    }
+    }}
 
-    .caja-presentacion strong{
-        color:white;
+    .caja-presentacion strong{{
+        color:{COLOR_WHITE};
         font-size:25px;
         font-weight:900;
-    }
+    }}
+
+    /* ================================================== */
+    /* Tablas HTML destacadas: Medicamentos seleccionados  */
+    /* y Agencias seleccionadas.                           */
+    /* ================================================== */
+
+    .tabla-destacada-wrapper{{
+        overflow-x:auto;
+        margin-top:0.4rem;
+        margin-bottom:1.4rem;
+    }}
+
+    table.tabla-destacada{{
+        width:auto;
+        border-collapse:collapse;
+        font-size:16px !important;
+        line-height:1.1 !important;
+    }}
+
+    table.tabla-destacada thead th{{
+        background-color:{COLOR_NAVY};
+        color:{COLOR_WHITE};
+        text-transform:uppercase;
+        font-weight:800;
+        text-align:center;
+        white-space:nowrap;
+        padding:5px 10px !important;
+        line-height:1.1 !important;
+        border:1px solid {COLOR_NAVY};
+    }}
+
+    table.tabla-destacada tbody td{{
+        white-space:nowrap;
+        padding:3px 10px !important;
+        line-height:1.1 !important;
+        border:1px solid #d9d9d9;
+        color:{COLOR_NAVY};
+        text-align:center;
+        background-color:{COLOR_WHITE};
+    }}
+
+    table.tabla-destacada tbody tr{{
+        height:auto !important;
+    }}
 
     </style>
     """,
@@ -298,8 +413,10 @@ st.markdown(
         Este sistema permite consultar medicamentos, estimar el gasto total,
         identificar posibles beneficios y seleccionar agencias PAMI de referencia.
         <br><br>
-        <strong>Importante:</strong> los resultados son orientativos. La cobertura final puede
-        depender de autorizaciones, empadronamientos o trámites específicos de PAMI.
+        <strong>Importante:</strong> todos los resultados de este sistema son orientativos y no reemplazan
+        la evaluación oficial de PAMI. La cobertura final puede depender de autorizaciones, empadronamientos
+        o trámites específicos. Ante cualquier duda, o para confirmar e iniciar los trámites correspondientes,
+        acérquese a una de las agencias PAMI que seleccione más abajo.
     </div>
     """,
     unsafe_allow_html=True
@@ -324,10 +441,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+mes_aguinaldo = st.checkbox("El monto que voy a ingresar corresponde a Junio o Diciembre (mes con aguinaldo)")
+# En junio y diciembre los jubilados y pensionados cobran el aguinaldo (SAC),
+# que aparece en el recibo como "PRESTACION ANUAL COMPLEMENTARIA LEY 24241".
+# Ese monto extra no forma parte del ingreso mensual habitual y, si se lo
+# tiene en cuenta, distorsiona el cálculo del porcentaje de gasto en
+# medicamentos y las alertas de beneficios (por ejemplo, el umbral del 15%
+# o el Subsidio Social).
+
+if mes_aguinaldo:
+    st.warning(
+        "Junio y diciembre incluyen el aguinaldo (SAC), lo que aumenta el ingreso informado y puede "
+        "distorsionar el cálculo del gasto en medicamentos y las alertas de beneficios. "
+        "Para que el análisis sea preciso, ingrese en el campo de abajo el monto correspondiente al "
+        "mes anterior (Mayo o Noviembre, según corresponda), ya que ese recibo no incluye aguinaldo."
+    )
+# Se avisa al usuario antes de que cargue el monto, para que no ingrese
+# el total de junio/diciembre por error.
+
 ingreso_jubilatorio = st.number_input("Ingrese el monto de su última jubilación o pensión",
                                       min_value=0.0,
                                       step=1000.0)
 # number_input permite ingresar números.
+# Si mes_aguinaldo está tildado, este valor debería corresponder al mes
+# anterior (Mayo o Noviembre), no al mes con aguinaldo.
 
 enfermedad_seleccionada = st.selectbox("¿Posee alguna enfermedad o tratamiento con posible cobertura especial?",
                                        obtener_enfermedades_cobertura_especial())
@@ -391,9 +528,8 @@ if len(st.session_state.medicamentos_seleccionados) > 0:
     # Empieza en 1 para evitar confusión en usuarios con muchos medicamentos.
     df_meds_mostrar.insert(0,"N°",range(1, len(df_meds_mostrar) + 1))
 
-    # hide_index=True oculta el índice interno de Pandas.
-    # Así el usuario ve N° 1, 2, 3... y no el índice 0, 1, 2...
-    st.dataframe(df_meds_mostrar,hide_index=True)
+    # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
+    mostrar_tabla_destacada(df_meds_mostrar)
 
     if st.button("Borrar medicamentos seleccionados"):
         st.session_state.medicamentos_seleccionados = []
@@ -536,7 +672,8 @@ else:
             if not df_agencias_seleccionadas.empty:
                 st.subheader("Agencias seleccionadas")
 
-                st.dataframe(df_agencias_seleccionadas,hide_index=True)
+                # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
+                mostrar_tabla_destacada(df_agencias_seleccionadas)
 
 
 
@@ -575,7 +712,7 @@ if st.button("Generar análisis"):
 
         st.subheader("Resumen económico")
         st.write(resultado["mensaje"])
-        st.dataframe(resultado["tabla_resumen"],hide_index=True)
+        mostrar_tabla_destacada(resultado["tabla_resumen"])
 
         st.subheader("Gráfico del ingreso")
 
@@ -598,7 +735,7 @@ if st.button("Generar análisis"):
         st.markdown(
             f"""
             <div style="
-                background-color:#FFB100;
+                background-color:{COLOR_ORANGE};
                 border-radius:10px;
                 height:38px;
                 width:100%;
@@ -606,7 +743,7 @@ if st.button("Generar análisis"):
                 margin-top:0.4rem;
                 margin-bottom:0.6rem;">
                 <div style="
-                    background-color:#005CA8;
+                    background-color:{COLOR_NAVY};
                     height:100%;
                     width:{porcentaje_gasto_barra * 100}%;
                     border-radius:10px 0 0 10px;">
@@ -623,17 +760,40 @@ if st.button("Generar análisis"):
         )
 
         st.subheader("Posibles beneficios o trámites a consultar")
-        st.write(resultado["mensaje_beneficios"])
-        
-        
+
+        st.caption(
+            "Estas alertas son orientativas y no implican aprobación automática de ningún beneficio. "
+            "Para confirmar requisitos e iniciar los trámites, acérquese a una de las agencias PAMI "
+            "seleccionadas."
+        )
+
+        alertas_beneficios = resultado["alertas_beneficios"]
+
+        if len(alertas_beneficios) == 0:
+            st.info(
+                "No se detectaron alertas automáticas de beneficios adicionales según los datos ingresados. "
+                "De todos modos, la cobertura real puede variar según la situación particular del afiliado "
+                "y las autorizaciones vigentes de PAMI."
+            )
+        else:
+            # Cada alerta se muestra como un ítem propio: título en
+            # negrita y, debajo, el desarrollo breve.
+            for alerta in alertas_beneficios:
+                st.markdown(f"**{alerta['titulo']}**")
+                st.write(alerta["mensaje"])
+                st.markdown("---")
+
+
 # ==========================================================
 # GENERAR PDF INFORMATIVO FINAL
 
         ruta_pdf = generar_pdf_resumen(resumen=resultado["resumen"],
                                        df_medicamentos=df_meds_seleccionados,
                                        df_agencias=df_agencias_seleccionadas,
+                                       alertas_beneficios=resultado["alertas_beneficios"],
                                        mensaje_beneficios=resultado["mensaje_beneficios"],
                                        enfermedad_seleccionada=enfermedad_seleccionada,
+                                       mes_aguinaldo=mes_aguinaldo,
                                        nombre_archivo="resumen_pami_streamlit.pdf")
 
         with open(ruta_pdf, "rb") as archivo_pdf:

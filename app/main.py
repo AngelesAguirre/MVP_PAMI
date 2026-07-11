@@ -231,6 +231,7 @@ try:
     ruta_pdf = generar_pdf_resumen(resumen=resultado["resumen"],
                                    df_medicamentos=medicamentos_seleccionados,
                                    df_agencias=df_agencias,
+                                   alertas_beneficios=resultado["alertas_beneficios"],
                                    mensaje_beneficios=resultado["mensaje_beneficios"],
                                    enfermedad_seleccionada=enfermedad_seleccionada,
                                    nombre_archivo="resumen_pami_prueba.pdf")

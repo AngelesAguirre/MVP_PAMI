@@ -130,14 +130,49 @@ class PDFResumenPAMI(FPDF):
 
 # 6. TÍTULO DE SECCIÓN (estilo institucional, sin numeración)
 
-def agregar_titulo_seccion(pdf, texto):
+def verificar_espacio_disponible(pdf, alto_necesario):
+    """
+    Controla que quede lugar suficiente en la página actual antes de
+    dibujar algo (por ejemplo, un título de sección seguido de su
+    contenido).
+
+    Si no queda espacio suficiente, fuerza un salto de página manual.
+
+    Esto evita el problema de "título huérfano": que un título de
+    sección quede solo al final de una hoja y todo su contenido pase
+    a la hoja siguiente. FPDF sólo hace saltos de página automáticos
+    cuando el contenido ya no entra, sin tener en cuenta que el título
+    y el contenido deberían mantenerse juntos.
+    """
+
+    espacio_restante = (pdf.h - pdf.b_margin) - pdf.get_y()
+
+    if espacio_restante < alto_necesario:
+        pdf.add_page()
+
+
+def agregar_titulo_seccion(pdf, texto, alto_minimo_contenido=25):
     """
     Agrega un título de sección destacado: fondo de color, tipografía en
     negrita y mayúscula, con las letras en azul institucional.
+
+    alto_minimo_contenido:
+        Estimación (en mm) del espacio que como mínimo va a ocupar el
+        contenido que sigue a este título. Se usa junto con
+        verificar_espacio_disponible() para que el título nunca quede
+        solo al final de una página, separado del contenido que le
+        corresponde.
     """
 
-    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
     alto = 9
+
+    # Antes de dibujar el título, nos aseguramos de que el título y al
+    # menos una porción representativa de su contenido entren juntos
+    # en la página actual. Si no entran, se pasa de página ANTES de
+    # dibujar el título (no después), evitando que quede huérfano.
+    verificar_espacio_disponible(pdf, alto + 4 + alto_minimo_contenido)
+
+    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
 
     x = pdf.l_margin
     y = pdf.get_y()
@@ -164,7 +199,7 @@ def agregar_resumen_economico(pdf, resumen):
     Agrega ingreso, gasto, saldo y porcentaje al PDF.
     """
 
-    agregar_titulo_seccion(pdf, "Resumen economico")
+    agregar_titulo_seccion(pdf, "Resumen economico", alto_minimo_contenido=45)
 
     pdf.set_font("Arial", "", 11)
     pdf.set_text_color(*COLOR_BLACK)
@@ -199,7 +234,7 @@ def agregar_medicamentos(pdf, df_medicamentos):
     tiene fondo de color, texto centrado, en negrita y en mayúscula.
     """
 
-    agregar_titulo_seccion(pdf, "Medicamentos seleccionados")
+    agregar_titulo_seccion(pdf, "Medicamentos seleccionados", alto_minimo_contenido=25)
 
     if df_medicamentos.empty:
         pdf.set_font("Arial", "", 11)
@@ -247,7 +282,7 @@ def agregar_agencias(pdf, df_agencias):
     (una al lado de la otra) para no desperdiciar espacio en la hoja.
     """
 
-    agregar_titulo_seccion(pdf, "Agencias PAMI seleccionadas")
+    agregar_titulo_seccion(pdf, "Agencias PAMI seleccionadas", alto_minimo_contenido=35)
 
     if df_agencias.empty:
         pdf.set_font("Arial", "", 11)
@@ -316,18 +351,52 @@ def agregar_agencias(pdf, df_agencias):
 
 # 10. AGREGAR BENEFICIOS Y TRÁMITES
 
-def agregar_beneficios(pdf, mensaje_beneficios=None, enfermedad_seleccionada="Ninguna"):
+def agregar_item_alerta(pdf, titulo, mensaje):
     """
-    Agrega al PDF las advertencias sobre posibles beneficios.
+    Dibuja un único ítem de alerta dentro de la sección de beneficios:
+    - título en negrita, color navy, en su propia línea;
+    - debajo, el desarrollo breve en texto normal.
+
+    Se controla que el título de la alerta no quede separado de su
+    desarrollo si justo cae al final de una página.
+    """
+
+    # Estimamos que un ítem ocupa al menos el título + 2 líneas de texto.
+    verificar_espacio_disponible(pdf, 7 + 14)
+
+    pdf.set_font("Arial", "B", 10.5)
+    pdf.set_text_color(*COLOR_NAVY)
+    pdf.multi_cell(0, 7, limpiar_texto_pdf(titulo))
+
+    pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(*COLOR_BLACK)
+    pdf.multi_cell(0, 6.5, limpiar_texto_pdf(mensaje))
+
+    pdf.ln(4)
+
+
+def agregar_beneficios(pdf, alertas_beneficios=None, mensaje_beneficios=None, enfermedad_seleccionada="Ninguna"):
+    """
+    Agrega al PDF las advertencias sobre posibles beneficios, separadas
+    por ítems (una alerta = un ítem, con título en negrita y desarrollo
+    breve debajo).
+
+    alertas_beneficios:
+        Lista de diccionarios generada por
+        beneficios.generar_alertas_beneficios(), cada uno con al menos
+        "titulo" y "mensaje". Es la forma preferida de pasar los datos,
+        porque permite dar a cada alerta su propio estilo.
 
     mensaje_beneficios:
-        Texto generado por beneficios.py / analisis_gasto.py.
+        Texto plano (de compatibilidad) generado por
+        beneficios.crear_mensaje_alertas(). Sólo se usa como respaldo si
+        no se recibió alertas_beneficios.
 
     enfermedad_seleccionada:
         Enfermedad indicada por el usuario en el sistema.
     """
 
-    agregar_titulo_seccion(pdf, "Posibles beneficios y tramites a consultar")
+    agregar_titulo_seccion(pdf, "Posibles beneficios y tramites a consultar", alto_minimo_contenido=45)
 
     pdf.set_font("Arial", "", 10)
     pdf.set_text_color(*COLOR_BLACK)
@@ -335,30 +404,77 @@ def agregar_beneficios(pdf, mensaje_beneficios=None, enfermedad_seleccionada="Ni
     enfermedad = limpiar_texto_pdf(enfermedad_seleccionada)
 
     pdf.multi_cell(0, 7, f"Enfermedad o condicion informada por el usuario: {enfermedad}")
+    pdf.ln(3)
 
-    pdf.ln(2)
+    # Aclaración general: el sistema es orientativo y las gestiones se
+    # confirman en la agencia PAMI seleccionada.
+    pdf.set_font("Arial", "I", 9.5)
+    pdf.set_text_color(*COLOR_SLATE)
+    pdf.multi_cell(0, 6, limpiar_texto_pdf(
+        "Las siguientes alertas son orientativas y no implican aprobacion automatica de ningun beneficio. "
+        "Para confirmar requisitos e iniciar los tramites, acerquese a una de las agencias PAMI seleccionadas."))
+    pdf.set_text_color(*COLOR_BLACK)
+    pdf.ln(4)
 
-    if mensaje_beneficios:
-        texto = limpiar_texto_pdf(mensaje_beneficios)
+    # Caso preferido: se recibió la lista estructurada de alertas.
+    if alertas_beneficios:
+        for alerta in alertas_beneficios:
+            titulo = alerta.get("titulo") or "Alerta"
+            mensaje = alerta.get("mensaje", "")
+
+            if mensaje:
+                agregar_item_alerta(pdf, titulo, mensaje)
+
+    # Respaldo: sólo se recibió el mensaje en texto plano. Se quitan los
+    # "**" de negrita markdown porque FPDF no los interpreta y se
+    # verían literalmente en el PDF.
+    elif mensaje_beneficios:
+        texto_sin_markdown = mensaje_beneficios.replace("**", "")
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(0, 7, limpiar_texto_pdf(texto_sin_markdown))
+        pdf.ln(4)
+
+    # No hay alertas ni mensaje: se avisa que no se detectó nada especial.
     else:
-        texto = ("No se cargaron alertas especificas de beneficios. De todos modos, la cobertura real puede "
-            "variar segun autorizaciones particulares de PAMI.")
-
-    pdf.multi_cell(0, 7, texto)
-    pdf.ln(6)
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(0, 7, limpiar_texto_pdf(
+            "No se detectaron alertas automaticas de beneficios adicionales segun los datos ingresados. De "
+            "todos modos, la cobertura real puede variar segun la situacion particular del afiliado y las "
+            "autorizaciones vigentes de PAMI."))
+        pdf.ln(4)
 
 
 # 11. AGREGAR MENSAJE FINAL
 
-def agregar_mensaje_final(pdf):
+def agregar_mensaje_final(pdf, mes_aguinaldo=False):
     """
     Agrega aclaración general final.
+
+    mes_aguinaldo:
+        Indica si el ingreso informado por el usuario corresponde en
+        realidad al mes anterior a Junio o Diciembre, porque esos meses
+        incluyen el aguinaldo (SAC) y no se usan para el cálculo.
     """
 
-    agregar_titulo_seccion(pdf, "Informacion importante")
+    agregar_titulo_seccion(pdf, "Informacion importante", alto_minimo_contenido=30)
 
     pdf.set_font("Arial", "", 10)
     pdf.set_text_color(*COLOR_BLACK)
+
+    # a. Aclaración sobre el aguinaldo, si corresponde.
+    # Se muestra primero porque afecta directamente la lectura del ingreso
+    # jubilatorio usado en el resto del informe.
+    if mes_aguinaldo:
+        texto_aguinaldo = (
+            "Aclaracion sobre el aguinaldo: el usuario indico que el mes consultado (Junio o Diciembre) "
+            "incluye el aguinaldo (SAC). Por eso, el ingreso jubilatorio utilizado en este informe "
+            "corresponde al mes anterior (Mayo o Noviembre), que no incluye aguinaldo, para no distorsionar "
+            "el calculo del gasto en medicamentos ni las alertas de beneficios.")
+
+        pdf.set_font("Arial", "B", 10)
+        pdf.multi_cell(0, 7, limpiar_texto_pdf(texto_aguinaldo))
+        pdf.set_font("Arial", "", 10)
+        pdf.ln(2)
 
     texto = (
         "Este resumen es orientativo. Los valores pueden variar segun la actualizacion de precios, la "
@@ -374,11 +490,28 @@ def agregar_mensaje_final(pdf):
 def generar_pdf_resumen(resumen,
                         df_medicamentos,
                         df_agencias,
+                        alertas_beneficios=None,
                         mensaje_beneficios=None,
                         enfermedad_seleccionada="Ninguna",
+                        mes_aguinaldo=False,
                         nombre_archivo="resumen_pami.pdf"):
     """
     Genera el PDF final del sistema.
+
+    alertas_beneficios:
+        Lista de alertas (con "titulo" y "mensaje") generada por
+        beneficios.generar_alertas_beneficios(). Es la forma preferida
+        de mostrar los beneficios en el PDF, separados por ítems.
+
+    mensaje_beneficios:
+        Texto de respaldo (compatibilidad hacia atrás) usado únicamente
+        si no se recibió alertas_beneficios.
+
+    mes_aguinaldo:
+        Indica si el usuario marcó que el mes original consultado
+        (Junio o Diciembre) incluye aguinaldo, y que por lo tanto el
+        ingreso jubilatorio usado en el análisis corresponde al mes
+        anterior (Mayo o Noviembre).
     """
 
     ruta_pdf = PDF_DIR / nombre_archivo
@@ -389,9 +522,11 @@ def generar_pdf_resumen(resumen,
     agregar_resumen_economico(pdf, resumen)
     agregar_medicamentos(pdf, df_medicamentos)
     agregar_agencias(pdf, df_agencias)
-    agregar_beneficios(pdf,mensaje_beneficios=mensaje_beneficios,
+    agregar_beneficios(pdf,
+                       alertas_beneficios=alertas_beneficios,
+                       mensaje_beneficios=mensaje_beneficios,
                        enfermedad_seleccionada=enfermedad_seleccionada)
-    agregar_mensaje_final(pdf)
+    agregar_mensaje_final(pdf, mes_aguinaldo=mes_aguinaldo)
 
     pdf.output(str(ruta_pdf))
 
