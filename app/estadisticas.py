@@ -59,6 +59,23 @@ def inicializar_base_datos():
         )
     """)
 
+    # Tabla de análisis realizados: cada vez que un usuario aprieta
+    # "Generar análisis", se guarda un resumen anónimo (sin nombre, sin
+    # ningún dato que identifique al afiliado) con los montos y
+    # porcentajes involucrados. Esto permite calcular estadísticas
+    # agregadas de uso real del sistema, como el porcentaje promedio del
+    # ingreso que los usuarios destinan a medicamentos.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analisis_realizados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ingreso_jubilatorio REAL,
+            gasto_total_medicamentos REAL,
+            cantidad_medicamentos INTEGER,
+            porcentaje_gasto REAL,
+            fecha TEXT
+        )
+    """)
+
     conexion.commit()
     conexion.close()
 
@@ -154,3 +171,97 @@ def obtener_cantidad_total_consultas():
     conexion.close()
 
     return total
+
+
+# 7. REGISTRAR UN ANÁLISIS COMPLETO (para estadísticas agregadas)
+
+def registrar_analisis(ingreso_jubilatorio, gasto_total_medicamentos,
+                       cantidad_medicamentos, porcentaje_gasto):
+    """
+    Guarda, de forma anónima, el resumen de un análisis completo cada
+    vez que un usuario aprieta "Generar análisis" en el sistema.
+
+    NO se guarda ningún dato que identifique al afiliado (ni nombre, ni
+    enfermedad, ni agencias elegidas): solo los montos y porcentajes
+    necesarios para calcular promedios generales de uso del sistema.
+
+    Esta función se llama desde streamlit_app.py, dentro del botón
+    "Generar análisis", una vez que el análisis se calculó con éxito.
+    """
+
+    inicializar_base_datos()
+
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conexion = sqlite3.connect(RUTA_BASE_DATOS)
+    cursor = conexion.cursor()
+
+    cursor.execute("""
+        INSERT INTO analisis_realizados
+            (ingreso_jubilatorio, gasto_total_medicamentos, cantidad_medicamentos, porcentaje_gasto, fecha)
+        VALUES (?, ?, ?, ?, ?)
+    """, (float(ingreso_jubilatorio), float(gasto_total_medicamentos),
+          int(cantidad_medicamentos), float(porcentaje_gasto), fecha_actual))
+
+    conexion.commit()
+    conexion.close()
+
+
+# 8. OBTENER ESTADÍSTICAS AGREGADAS DE LOS ANÁLISIS REALIZADOS
+
+def obtener_estadisticas_analisis():
+    """
+    Calcula estadísticas agregadas sobre todos los análisis realizados
+    hasta ahora por los usuarios del sistema.
+
+    Devuelve un diccionario con:
+        - cantidad_analisis: cuántos análisis se generaron en total.
+        - promedio_ingreso: ingreso jubilatorio promedio informado.
+        - promedio_gasto_total: gasto promedio en medicamentos.
+        - promedio_porcentaje_gasto: porcentaje promedio del ingreso
+          destinado a medicamentos (el dato más útil para entender el
+          impacto real del gasto en medicamentos sobre los afiliados
+          que usaron el sistema).
+        - promedio_cantidad_medicamentos: cantidad promedio de
+          medicamentos por consulta.
+
+    Si todavía no hay ningún análisis registrado, todos los promedios
+    se devuelven en 0 para evitar errores de división por cero.
+    """
+
+    inicializar_base_datos()
+
+    conexion = sqlite3.connect(RUTA_BASE_DATOS)
+    cursor = conexion.cursor()
+
+    cursor.execute("""
+        SELECT
+            COUNT(*),
+            AVG(ingreso_jubilatorio),
+            AVG(gasto_total_medicamentos),
+            AVG(porcentaje_gasto),
+            AVG(cantidad_medicamentos)
+        FROM analisis_realizados
+    """)
+
+    fila = cursor.fetchone()
+    conexion.close()
+
+    cantidad_analisis = fila[0] or 0
+
+    if cantidad_analisis == 0:
+        return {
+            "cantidad_analisis": 0,
+            "promedio_ingreso": 0.0,
+            "promedio_gasto_total": 0.0,
+            "promedio_porcentaje_gasto": 0.0,
+            "promedio_cantidad_medicamentos": 0.0
+        }
+
+    return {
+        "cantidad_analisis": cantidad_analisis,
+        "promedio_ingreso": fila[1] or 0.0,
+        "promedio_gasto_total": fila[2] or 0.0,
+        "promedio_porcentaje_gasto": fila[3] or 0.0,
+        "promedio_cantidad_medicamentos": fila[4] or 0.0
+    }

@@ -64,10 +64,21 @@ from scraping_precios_actualizados import actualizar_precio_con_web
 
 from estadisticas import (registrar_medicamento,
                           obtener_top_medicamentos,
-                          obtener_cantidad_total_consultas)
+                          obtener_cantidad_total_consultas,
+                          registrar_analisis,
+                          obtener_estadisticas_analisis)
 # Permite registrar de forma anónima cada medicamento agregado por los
 # usuarios (solo droga y marca, nunca datos personales) y luego consultar
 # un ranking de los medicamentos más consultados históricamente.
+# registrar_analisis / obtener_estadisticas_analisis alimentan la vista
+# de "Análisis de datos en conjunto", pensada para un perfil de usuario
+# más técnico (a diferencia del resto de la app, diseñada para
+# adultos mayores con poca experiencia en tecnología).
+
+import altair as alt
+# Altair viene incluido con Streamlit (no requiere agregarlo a
+# requirements.txt). Se usa únicamente en la vista de "Análisis de
+# datos en conjunto" para los gráficos de barras e histograma.
 
 
 # ==========================================================
@@ -403,6 +414,37 @@ if "agencias_seleccionadas" not in st.session_state:
 
 
 # ==========================================================
+# 7.1. SELECTOR DE MODO (dos públicos distintos, dos experiencias distintas)
+#
+# El sistema tiene dos audiencias muy diferentes:
+#
+# - "Sistema de orientación": pensado para el afiliado (adulto mayor,
+#   con poca experiencia en tecnología). Por eso mantiene un flujo
+#   único, lineal, de arriba hacia abajo, sin menús ni navegación que
+#   pueda confundir: cargar datos, elegir medicamentos, elegir
+#   agencias, ver el resultado.
+#
+# - "Análisis de datos en conjunto": pensado para alguien con más
+#   perfil técnico (un equipo de PAMI, un investigador, un
+#   desarrollador) que quiere ver estadísticas agregadas de uso del
+#   sistema. Acá sí se prioriza la densidad de información por sobre
+#   la simplicidad, porque el público esperado es otro.
+
+MODO_SISTEMA = "🧑‍⚕️ Sistema de orientación"
+MODO_ANALISIS = "📊 Análisis de datos en conjunto"
+
+with st.sidebar:
+    st.markdown("## Modo de la aplicación")
+
+    modo = st.radio(
+        "Elegí qué querés ver:",
+        [MODO_SISTEMA, MODO_ANALISIS],
+        label_visibility="collapsed")
+
+    st.markdown("---")
+
+
+# ==========================================================
 # 8. TÍTULO Y MENSAJE DE BIENVENIDA
 
 st.markdown(
@@ -428,383 +470,492 @@ st.markdown(
 )
 
 
-# 9. CARGAR BASES
+if modo == MODO_SISTEMA:
 
-df_medicamentos = cargar_base_medicamentos()
-df_agencias = cargar_base_agencias()
+    # 9. CARGAR BASES
 
-
-# 9.1. PANEL DE ESTADÍSTICAS (medicamentos más consultados)
-
-with st.sidebar:
-    st.markdown("### Medicamentos más consultados")
-
-    total_consultas = obtener_cantidad_total_consultas()
-
-    if total_consultas == 0:
-        st.caption("Todavía no hay consultas registradas.")
-    else:
-        st.caption(f"Sobre un total de {total_consultas} consultas registradas.")
-
-        top_medicamentos = obtener_top_medicamentos(cantidad=5)
-
-        for droga, marca, cantidad in top_medicamentos:
-            st.write(f"**{marca}** ({droga}) — {cantidad} consultas")
+    df_medicamentos = cargar_base_medicamentos()
+    df_agencias = cargar_base_agencias()
 
 
-# ==========================================================
-# DATOS DEL USUARIO
+    # ==========================================================
+    # DATOS DEL USUARIO
 
-st.markdown(
-    """
-    <div class="titulo-seccion">
-        Datos del afiliado
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-mes_aguinaldo = st.checkbox("El monto que voy a ingresar corresponde a Junio o Diciembre (mes con aguinaldo)")
-# En junio y diciembre los jubilados y pensionados cobran el aguinaldo (SAC),
-# que aparece en el recibo como "PRESTACION ANUAL COMPLEMENTARIA LEY 24241".
-# Ese monto extra no forma parte del ingreso mensual habitual y, si se lo
-# tiene en cuenta, distorsiona el cálculo del porcentaje de gasto en
-# medicamentos y las alertas de beneficios (por ejemplo, el umbral del 15%
-# o el Subsidio Social).
-
-if mes_aguinaldo:
-    st.warning(
-        "Junio y diciembre incluyen el aguinaldo (SAC), lo que aumenta el ingreso informado y puede "
-        "distorsionar el cálculo del gasto en medicamentos y las alertas de beneficios. "
-        "Para que el análisis sea preciso, ingrese en el campo de abajo el monto correspondiente al "
-        "mes anterior (Mayo o Noviembre, según corresponda), ya que ese recibo no incluye aguinaldo."
+    st.markdown(
+        """
+        <div class="titulo-seccion">
+            Datos del afiliado
+        </div>
+        """,
+        unsafe_allow_html=True
     )
-# Se avisa al usuario antes de que cargue el monto, para que no ingrese
-# el total de junio/diciembre por error.
 
-ingreso_jubilatorio = st.number_input("Ingrese el monto de su última jubilación o pensión",
-                                      min_value=0.0,
-                                      step=1000.0)
-# number_input permite ingresar números.
-# Si mes_aguinaldo está tildado, este valor debería corresponder al mes
-# anterior (Mayo o Noviembre), no al mes con aguinaldo.
+    mes_aguinaldo = st.checkbox("El monto que voy a ingresar corresponde a Junio o Diciembre (mes con aguinaldo)")
+    # En junio y diciembre los jubilados y pensionados cobran el aguinaldo (SAC),
+    # que aparece en el recibo como "PRESTACION ANUAL COMPLEMENTARIA LEY 24241".
+    # Ese monto extra no forma parte del ingreso mensual habitual y, si se lo
+    # tiene en cuenta, distorsiona el cálculo del porcentaje de gasto en
+    # medicamentos y las alertas de beneficios (por ejemplo, el umbral del 15%
+    # o el Subsidio Social).
 
-enfermedad_seleccionada = st.selectbox("¿Posee alguna enfermedad o tratamiento con posible cobertura especial?",
-                                       obtener_enfermedades_cobertura_especial())
-# selectbox crea una lista desplegable.
+    if mes_aguinaldo:
+        st.warning(
+            "Junio y diciembre incluyen el aguinaldo (SAC), lo que aumenta el ingreso informado y puede "
+            "distorsionar el cálculo del gasto en medicamentos y las alertas de beneficios. "
+            "Para que el análisis sea preciso, ingrese en el campo de abajo el monto correspondiente al "
+            "mes anterior (Mayo o Noviembre, según corresponda), ya que ese recibo no incluye aguinaldo."
+        )
+    # Se avisa al usuario antes de que cargue el monto, para que no ingrese
+    # el total de junio/diciembre por error.
 
-incluye_bono = st.checkbox("El monto ingresado incluye bono previsional",
-                           value=True)
-# checkbox permite responder Sí/No.
+    ingreso_jubilatorio = st.number_input("Ingrese el monto de su última jubilación o pensión",
+                                          min_value=0.0,
+                                          step=1000.0)
+    # number_input permite ingresar números.
+    # Si mes_aguinaldo está tildado, este valor debería corresponder al mes
+    # anterior (Mayo o Noviembre), no al mes con aguinaldo.
+
+    enfermedad_seleccionada = st.selectbox("¿Posee alguna enfermedad o tratamiento con posible cobertura especial?",
+                                           obtener_enfermedades_cobertura_especial())
+    # selectbox crea una lista desplegable.
+
+    incluye_bono = st.checkbox("El monto ingresado incluye bono previsional",
+                               value=True)
+    # checkbox permite responder Sí/No.
 
 
-# ==========================================================
-# SELECCIÓN DE MEDICAMENTOS
-st.markdown(
-    """
-    <div class="titulo-seccion">
-        Selección de medicamentos
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+    # ==========================================================
+    # SELECCIÓN DE MEDICAMENTOS
+    st.markdown(
+        """
+        <div class="titulo-seccion">
+            Selección de medicamentos
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-busqueda = st.text_input("Escriba el nombre, marca o droga del medicamento")
-# text_input permite escribir texto libre.
+    busqueda = st.text_input("Escriba el nombre, marca o droga del medicamento")
+    # text_input permite escribir texto libre.
 
-if busqueda:
-    resultado_busqueda = buscar_medicamento(busqueda, df_medicamentos)
+    if busqueda:
+        resultado_busqueda = buscar_medicamento(busqueda, df_medicamentos)
 
-    opciones = preparar_opciones_medicamentos(resultado_busqueda)
+        opciones = preparar_opciones_medicamentos(resultado_busqueda)
 
-    if opciones.empty:
-        st.warning("No se encontraron medicamentos con esa búsqueda.")
+        if opciones.empty:
+            st.warning("No se encontraron medicamentos con esa búsqueda.")
+
+        else:
+            opciones["Texto_Opcion"] = opciones.apply(crear_texto_opcion_medicamento,axis=1)
+
+            indice_medicamento = st.selectbox("Seleccione el medicamento encontrado",
+                                              range(len(opciones)),
+                                              format_func=lambda i: opciones.iloc[i]["Texto_Opcion"])
+
+            if st.button("Agregar medicamento"):
+                medicamento = opciones.iloc[indice_medicamento].to_dict()
+
+                with st.spinner("Consultando precio actualizado en la web..."):
+                    medicamento = actualizar_precio_con_web(medicamento)
+                # Desde acá en adelante, A_PAGAR ya es el mayor entre el
+                # precio del dataset PAMI y el precio actualizado de la web.
+
+                st.session_state.medicamentos_seleccionados.append(medicamento)
+
+                # Registro anónimo para estadísticas de medicamentos más
+                # consultados. No se guarda ningún dato del afiliado.
+                registrar_medicamento(droga=medicamento.get("DROGA", ""),
+                                     marca=medicamento.get("MARCA", ""))
+
+                st.success("Medicamento agregado correctamente.")
+
+    if len(st.session_state.medicamentos_seleccionados) > 0:
+        st.subheader("Medicamentos seleccionados")
+
+        df_meds_seleccionados = pd.DataFrame(st.session_state.medicamentos_seleccionados)
+
+        # Crear una copia solo para mostrar en pantalla.
+        # No modifica la tabla original que después se usa para cálculos.
+        df_meds_mostrar = df_meds_seleccionados.copy()
+
+        # Agrega una columna visual llamada N°.
+        # Empieza en 1 para evitar confusión en usuarios con muchos medicamentos.
+        df_meds_mostrar.insert(0,"N°",range(1, len(df_meds_mostrar) + 1))
+
+        # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
+        mostrar_tabla_destacada(df_meds_mostrar)
+
+        if st.button("Borrar medicamentos seleccionados"):
+            st.session_state.medicamentos_seleccionados = []
+            st.rerun()
 
     else:
-        opciones["Texto_Opcion"] = opciones.apply(crear_texto_opcion_medicamento,axis=1)
+        df_meds_seleccionados = pd.DataFrame()
 
-        indice_medicamento = st.selectbox("Seleccione el medicamento encontrado",
-                                          range(len(opciones)),
-                                          format_func=lambda i: opciones.iloc[i]["Texto_Opcion"])
+    # ==========================================================
+    # SELECCIÓN DE AGENCIAS
 
-        if st.button("Agregar medicamento"):
-            medicamento = opciones.iloc[indice_medicamento].to_dict()
+    st.markdown(
+        """
+        <div class="titulo-seccion">
+            Agencias PAMI
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-            with st.spinner("Consultando precio actualizado en la web..."):
-                medicamento = actualizar_precio_con_web(medicamento)
-            # Desde acá en adelante, A_PAGAR ya es el mayor entre el
-            # precio del dataset PAMI y el precio actualizado de la web.
+    agencias_seleccionadas = []
+    # Se crea una lista vacía donde luego se guardarán las agencias elegidas.
 
-            st.session_state.medicamentos_seleccionados.append(medicamento)
+    provincias = obtener_provincias(df_agencias)
 
-            # Registro anónimo para estadísticas de medicamentos más
-            # consultados. No se guarda ningún dato del afiliado.
-            registrar_medicamento(droga=medicamento.get("DROGA", ""),
-                                 marca=medicamento.get("MARCA", ""))
+    provincia = st.selectbox("Seleccione su provincia",
+                             ["Seleccione..."] + provincias)
+    # Se agrega "Seleccione..." como primera opción para evitar
+    # que Streamlit elija automáticamente la primera provincia.
 
-            st.success("Medicamento agregado correctamente.")
-
-if len(st.session_state.medicamentos_seleccionados) > 0:
-    st.subheader("Medicamentos seleccionados")
-
-    df_meds_seleccionados = pd.DataFrame(st.session_state.medicamentos_seleccionados)
-
-    # Crear una copia solo para mostrar en pantalla.
-    # No modifica la tabla original que después se usa para cálculos.
-    df_meds_mostrar = df_meds_seleccionados.copy()
-
-    # Agrega una columna visual llamada N°.
-    # Empieza en 1 para evitar confusión en usuarios con muchos medicamentos.
-    df_meds_mostrar.insert(0,"N°",range(1, len(df_meds_mostrar) + 1))
-
-    # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
-    mostrar_tabla_destacada(df_meds_mostrar)
-
-    if st.button("Borrar medicamentos seleccionados"):
-        st.session_state.medicamentos_seleccionados = []
-        st.rerun()
-
-else:
-    df_meds_seleccionados = pd.DataFrame()
-
-# ==========================================================
-# SELECCIÓN DE AGENCIAS
-
-st.markdown(
-    """
-    <div class="titulo-seccion">
-        Agencias PAMI
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-agencias_seleccionadas = []
-# Se crea una lista vacía donde luego se guardarán las agencias elegidas.
-
-provincias = obtener_provincias(df_agencias)
-
-provincia = st.selectbox("Seleccione su provincia",
-                         ["Seleccione..."] + provincias)
-# Se agrega "Seleccione..." como primera opción para evitar
-# que Streamlit elija automáticamente la primera provincia.
-
-if provincia == "Seleccione...":
-    st.info("Seleccione una provincia para continuar.")
-    df_agencias_seleccionadas = pd.DataFrame()
-
-else:
-    ubicaciones = obtener_ubicaciones_por_provincia(df_agencias,
-                                                    provincia)
-
-    ubicacion = st.selectbox("Seleccione la UGL o ubicación territorial más cercana",
-                             ["Seleccione..."] + ubicaciones)
-
-    if ubicacion == "Seleccione...":
-        st.info("Seleccione una UGL o ubicación territorial para continuar.")
+    if provincia == "Seleccione...":
+        st.info("Seleccione una provincia para continuar.")
         df_agencias_seleccionadas = pd.DataFrame()
 
     else:
-        localidades = obtener_localidades_por_ubicacion(df_agencias,
-                                                        provincia,
-                                                        ubicacion)
+        ubicaciones = obtener_ubicaciones_por_provincia(df_agencias,
+                                                        provincia)
 
-        localidad = st.selectbox(
-            "Seleccione su localidad o la más cercana",
-            ["Seleccione..."] + localidades)
+        ubicacion = st.selectbox("Seleccione la UGL o ubicación territorial más cercana",
+                                 ["Seleccione..."] + ubicaciones)
 
-        if localidad == "Seleccione...":
-            st.info("Seleccione una localidad para continuar.")
+        if ubicacion == "Seleccione...":
+            st.info("Seleccione una UGL o ubicación territorial para continuar.")
             df_agencias_seleccionadas = pd.DataFrame()
 
         else:
-            agencias_localidad = obtener_agencias_por_localidad(df_agencias,
-                                                                provincia,
-                                                                ubicacion,
-                                                                localidad)
+            localidades = obtener_localidades_por_ubicacion(df_agencias,
+                                                            provincia,
+                                                            ubicacion)
 
-            st.write("Agencias encontradas en la localidad seleccionada:")
+            localidad = st.selectbox(
+                "Seleccione su localidad o la más cercana",
+                ["Seleccione..."] + localidades)
 
-            st.dataframe(agencias_localidad[["Nombre_Agencia", "Domicilio", "Localidad"]],
-                         hide_index=True)
+            if localidad == "Seleccione...":
+                st.info("Seleccione una localidad para continuar.")
+                df_agencias_seleccionadas = pd.DataFrame()
 
-            if len(agencias_localidad) == 1:
-                agencia_1 = seleccionar_unica_agencia(agencias_localidad)
-                agencias_seleccionadas.append(agencia_1)
+            else:
+                agencias_localidad = obtener_agencias_por_localidad(df_agencias,
+                                                                    provincia,
+                                                                    ubicacion,
+                                                                    localidad)
 
-                st.info("Esta localidad tiene una sola agencia. "
-                        "Se seleccionó automáticamente como primera agencia.")
+                st.write("Agencias encontradas en la localidad seleccionada:")
 
-                localidades_alternativas = obtener_localidades_alternativas(df_agencias,
-                                                                            provincia,
-                                                                            ubicacion,
-                                                                            localidad)
+                st.dataframe(agencias_localidad[["Nombre_Agencia", "Domicilio", "Localidad"]],
+                             hide_index=True)
 
-                if len(localidades_alternativas) > 0:
-                    segunda_localidad = st.selectbox("Seleccione una segunda localidad cercana",
-                                                     ["Seleccione..."] + localidades_alternativas)
+                if len(agencias_localidad) == 1:
+                    agencia_1 = seleccionar_unica_agencia(agencias_localidad)
+                    agencias_seleccionadas.append(agencia_1)
 
-                    if segunda_localidad != "Seleccione...":
-                        agencias_segunda_localidad = obtener_agencias_por_localidad(df_agencias,
-                                                                                    provincia,
-                                                                                    ubicacion,
-                                                                                    segunda_localidad)
+                    st.info("Esta localidad tiene una sola agencia. "
+                            "Se seleccionó automáticamente como primera agencia.")
 
-                        if len(agencias_segunda_localidad) == 1:
-                            agencia_2 = seleccionar_segunda_agencia(agencias_segunda_localidad)
-                            agencias_seleccionadas.append(agencia_2)
+                    localidades_alternativas = obtener_localidades_alternativas(df_agencias,
+                                                                                provincia,
+                                                                                ubicacion,
+                                                                                localidad)
 
-                            st.info("La segunda localidad también tiene una sola agencia. "
-                                    "Se seleccionó automáticamente.")
+                    if len(localidades_alternativas) > 0:
+                        segunda_localidad = st.selectbox("Seleccione una segunda localidad cercana",
+                                                         ["Seleccione..."] + localidades_alternativas)
 
-                        elif len(agencias_segunda_localidad) > 1:
-                            agencias_segunda_localidad["Texto_Opcion"] = (
-                                agencias_segunda_localidad.apply(
-                                    crear_texto_opcion_agencia,
-                                    axis=1))
+                        if segunda_localidad != "Seleccione...":
+                            agencias_segunda_localidad = obtener_agencias_por_localidad(df_agencias,
+                                                                                        provincia,
+                                                                                        ubicacion,
+                                                                                        segunda_localidad)
 
-                            indice_agencia_2 = st.selectbox(
-                                "Seleccione la segunda agencia",
-                                range(len(agencias_segunda_localidad)),
-                                format_func=lambda i: agencias_segunda_localidad.loc[
-                                    i,
-                                    "Texto_Opcion"])
+                            if len(agencias_segunda_localidad) == 1:
+                                agencia_2 = seleccionar_segunda_agencia(agencias_segunda_localidad)
+                                agencias_seleccionadas.append(agencia_2)
 
-                            agencia_2 = seleccionar_segunda_agencia(
-                                agencias_segunda_localidad,
-                                indice_agencia_2)
+                                st.info("La segunda localidad también tiene una sola agencia. "
+                                        "Se seleccionó automáticamente.")
 
-                            agencias_seleccionadas.append(agencia_2)
+                            elif len(agencias_segunda_localidad) > 1:
+                                agencias_segunda_localidad["Texto_Opcion"] = (
+                                    agencias_segunda_localidad.apply(
+                                        crear_texto_opcion_agencia,
+                                        axis=1))
 
-            elif len(agencias_localidad) >= 2:
-                agencias_localidad["Texto_Opcion"] = agencias_localidad.apply(
-                    crear_texto_opcion_agencia,
-                    axis=1)
+                                indice_agencia_2 = st.selectbox(
+                                    "Seleccione la segunda agencia",
+                                    range(len(agencias_segunda_localidad)),
+                                    format_func=lambda i: agencias_segunda_localidad.loc[
+                                        i,
+                                        "Texto_Opcion"])
 
-                indice_1 = st.selectbox("Seleccione la primera agencia",
-                                        range(len(agencias_localidad)),
-                                        format_func=lambda i: agencias_localidad.loc[i, "Texto_Opcion"])
+                                agencia_2 = seleccionar_segunda_agencia(
+                                    agencias_segunda_localidad,
+                                    indice_agencia_2)
 
-                indice_2 = st.selectbox("Seleccione la segunda agencia",
-                                        range(len(agencias_localidad)),
-                                        format_func=lambda i: agencias_localidad.loc[i, "Texto_Opcion"])
+                                agencias_seleccionadas.append(agencia_2)
 
-                if indice_1 != indice_2:
-                    agencias_seleccionadas = seleccionar_dos_agencias_misma_localidad(agencias_localidad,
-                                                                                      indice_1,
-                                                                                      indice_2)
-                else:
-                    st.warning("Seleccione dos agencias distintas.")
+                elif len(agencias_localidad) >= 2:
+                    agencias_localidad["Texto_Opcion"] = agencias_localidad.apply(
+                        crear_texto_opcion_agencia,
+                        axis=1)
 
-            df_agencias_seleccionadas = armar_resumen_agencias(agencias_seleccionadas)
+                    indice_1 = st.selectbox("Seleccione la primera agencia",
+                                            range(len(agencias_localidad)),
+                                            format_func=lambda i: agencias_localidad.loc[i, "Texto_Opcion"])
 
-            if not df_agencias_seleccionadas.empty:
-                st.subheader("Agencias seleccionadas")
+                    indice_2 = st.selectbox("Seleccione la segunda agencia",
+                                            range(len(agencias_localidad)),
+                                            format_func=lambda i: agencias_localidad.loc[i, "Texto_Opcion"])
 
-                # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
-                mostrar_tabla_destacada(df_agencias_seleccionadas)
+                    if indice_1 != indice_2:
+                        agencias_seleccionadas = seleccionar_dos_agencias_misma_localidad(agencias_localidad,
+                                                                                          indice_1,
+                                                                                          indice_2)
+                    else:
+                        st.warning("Seleccione dos agencias distintas.")
 
+                df_agencias_seleccionadas = armar_resumen_agencias(agencias_seleccionadas)
+
+                if not df_agencias_seleccionadas.empty:
+                    st.subheader("Agencias seleccionadas")
+
+                    # Tabla HTML con encabezado destacado (fondo de color, negrita, mayúscula).
+                    mostrar_tabla_destacada(df_agencias_seleccionadas)
+
+
+
+    # ==========================================================
+    # GENERAR ANÁLISIS ECONOMICO FINAL
+
+    st.markdown(
+        """
+        <div class="titulo-seccion">
+            Resultado final
+        </div>
+        """,
+        unsafe_allow_html=True)
+
+    if st.button("Generar análisis"):
+
+        if ingreso_jubilatorio <= 0:
+            st.error("Debe ingresar un monto jubilatorio válido.")
+
+        elif df_meds_seleccionados.empty:
+            st.error("Debe seleccionar al menos un medicamento.")
+
+        elif df_agencias_seleccionadas.empty:
+            st.error("Debe seleccionar agencias PAMI.")
+
+        else:
+
+            # df_meds_seleccionados ya tiene el precio final en A_PAGAR
+            # (el mayor entre dataset PAMI y web), porque esa comparación
+            # se hace al momento de apretar "Agregar medicamento".
+
+            resultado = armar_analisis_completo(ingreso_jubilatorio=ingreso_jubilatorio,
+                                                df_medicamentos_seleccionados=df_meds_seleccionados,
+                                                enfermedad_seleccionada=enfermedad_seleccionada,
+                                                incluye_bono=incluye_bono)
+
+            st.subheader("Resumen económico")
+            st.write(resultado["mensaje"])
+            mostrar_tabla_destacada(resultado["tabla_resumen"])
+
+            st.subheader("Gráfico del ingreso")
+
+            resumen_grafico = resultado["resumen"]
+
+            ingreso = resumen_grafico["Ingreso_Jubilatorio"]
+            gasto = resumen_grafico["Gasto_Total_Medicamentos"]
+            saldo = resumen_grafico["Saldo_Restante"]
+            cantidad = resumen_grafico["Cantidad_Medicamentos"]
+
+            if ingreso > 0:
+                porcentaje_gasto = gasto / ingreso
+            else:
+                porcentaje_gasto = 0
+
+            # Se limita entre 0 y 1 para que la barra no se rompa visualmente
+            # si el gasto llegara a superar el ingreso informado.
+            porcentaje_gasto_barra = max(0, min(porcentaje_gasto, 1))
+
+            # Registro anónimo del análisis, para calcular estadísticas
+            # agregadas en la vista "Análisis de datos en conjunto"
+            # (por ejemplo, el porcentaje promedio del ingreso que los
+            # usuarios destinan a medicamentos). No se guarda ningún
+            # dato que identifique al afiliado.
+            registrar_analisis(
+                ingreso_jubilatorio=ingreso,
+                gasto_total_medicamentos=gasto,
+                cantidad_medicamentos=cantidad,
+                porcentaje_gasto=resumen_grafico["Porcentaje_Gasto_Medicamentos"])
+
+            st.markdown(
+                f"""
+                <div style="
+                    background-color:{COLOR_ORANGE};
+                    border-radius:10px;
+                    height:38px;
+                    width:100%;
+                    overflow:hidden;
+                    margin-top:0.4rem;
+                    margin-bottom:0.6rem;">
+                    <div style="
+                        background-color:{COLOR_NAVY};
+                        height:100%;
+                        width:{porcentaje_gasto_barra * 100}%;
+                        border-radius:10px 0 0 10px;">
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.write(
+                f"Medicamentos ({cantidad}): ${gasto:,.2f}  |  "
+                f"Saldo restante: ${saldo:,.2f}  |  "
+                f"{porcentaje_gasto * 100:.2f}% del ingreso"
+            )
+
+            st.subheader("Posibles beneficios o trámites a consultar")
+            st.write(resultado["mensaje_beneficios"])
+        
+        
+    # ==========================================================
+    # GENERAR PDF INFORMATIVO FINAL
+
+            ruta_pdf = generar_pdf_resumen(resumen=resultado["resumen"],
+                                           df_medicamentos=df_meds_seleccionados,
+                                           df_agencias=df_agencias_seleccionadas,
+                                           mensaje_beneficios=resultado["mensaje_beneficios"],
+                                           enfermedad_seleccionada=enfermedad_seleccionada,
+                                           mes_aguinaldo=mes_aguinaldo,
+                                           nombre_archivo="resumen_pami_streamlit.pdf")
+
+            with open(ruta_pdf, "rb") as archivo_pdf:
+                st.download_button(label="Descargar PDF",
+                                   data=archivo_pdf,
+                                   file_name="resumen_pami.pdf",
+                                   mime="application/pdf")
 
 
 # ==========================================================
-# GENERAR ANÁLISIS ECONOMICO FINAL
+# MODO: ANÁLISIS DE DATOS EN CONJUNTO
+#
+# Vista pensada para un perfil de usuario más técnico (equipo de PAMI,
+# investigadores, desarrolladores), a diferencia del resto de la app,
+# diseñada para adultos mayores con poca experiencia en tecnología.
+# Por eso acá se prioriza la densidad de información y los gráficos
+# por sobre la simplicidad visual del resto del sistema.
 
-st.markdown(
-    """
-    <div class="titulo-seccion">
-        Resultado final
-    </div>
-    """,
-    unsafe_allow_html=True)
+elif modo == MODO_ANALISIS:
 
-if st.button("Generar análisis"):
+    st.markdown(
+        """
+        <div class="titulo-sistema" style="font-size:38px !important;">
+            Análisis de datos en conjunto
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    if ingreso_jubilatorio <= 0:
-        st.error("Debe ingresar un monto jubilatorio válido.")
+    st.caption(
+        "Estadísticas agregadas y anónimas sobre el uso del sistema. "
+        "Ningún dato individual de un afiliado (ingreso, enfermedad, agencias) "
+        "se identifica ni se muestra en esta vista.")
 
-    elif df_meds_seleccionados.empty:
-        st.error("Debe seleccionar al menos un medicamento.")
+    # ----------------------------------------------------------------
+    # 1. MEDICAMENTOS MÁS CONSULTADOS
 
-    elif df_agencias_seleccionadas.empty:
-        st.error("Debe seleccionar agencias PAMI.")
+    st.subheader("Medicamentos más consultados")
+
+    total_consultas_medicamentos = obtener_cantidad_total_consultas()
+
+    if total_consultas_medicamentos == 0:
+        st.info("Todavía no hay medicamentos registrados en el sistema.")
 
     else:
+        st.caption(f"Sobre un total de {total_consultas_medicamentos} consultas de medicamentos registradas.")
 
-        # df_meds_seleccionados ya tiene el precio final en A_PAGAR
-        # (el mayor entre dataset PAMI y web), porque esa comparación
-        # se hace al momento de apretar "Agregar medicamento".
+        top_10_medicamentos = obtener_top_medicamentos(cantidad=10)
 
-        resultado = armar_analisis_completo(ingreso_jubilatorio=ingreso_jubilatorio,
-                                            df_medicamentos_seleccionados=df_meds_seleccionados,
-                                            enfermedad_seleccionada=enfermedad_seleccionada,
-                                            incluye_bono=incluye_bono)
+        df_top_medicamentos = pd.DataFrame(
+            top_10_medicamentos,
+            columns=["Droga", "Marca", "Cantidad_Consultas"])
 
-        st.subheader("Resumen económico")
-        st.write(resultado["mensaje"])
-        mostrar_tabla_destacada(resultado["tabla_resumen"])
+        # Se arma una etiqueta combinada (marca + droga) para que el
+        # gráfico de barras sea legible aunque dos medicamentos
+        # compartan marca o droga.
+        df_top_medicamentos["Medicamento"] = (
+            df_top_medicamentos["Marca"] + " (" + df_top_medicamentos["Droga"] + ")")
 
-        st.subheader("Gráfico del ingreso")
+        grafico_top_medicamentos = alt.Chart(df_top_medicamentos).mark_bar(
+            color=COLOR_TEAL
+        ).encode(
+            x=alt.X("Cantidad_Consultas:Q", title="Cantidad de consultas"),
+            y=alt.Y("Medicamento:N", sort="-x", title=None),
+            tooltip=["Medicamento", "Cantidad_Consultas"]
+        ).properties(height=350)
 
-        resumen_grafico = resultado["resumen"]
+        st.altair_chart(grafico_top_medicamentos, use_container_width=True)
 
-        ingreso = resumen_grafico["Ingreso_Jubilatorio"]
-        gasto = resumen_grafico["Gasto_Total_Medicamentos"]
-        saldo = resumen_grafico["Saldo_Restante"]
-        cantidad = resumen_grafico["Cantidad_Medicamentos"]
+        with st.expander("Ver tabla completa"):
+            mostrar_tabla_destacada(
+                df_top_medicamentos[["Marca", "Droga", "Cantidad_Consultas"]])
 
-        if ingreso > 0:
-            porcentaje_gasto = gasto / ingreso
-        else:
-            porcentaje_gasto = 0
+    st.markdown("---")
 
-        # Se limita entre 0 y 1 para que la barra no se rompa visualmente
-        # si el gasto llegara a superar el ingreso informado.
-        porcentaje_gasto_barra = max(0, min(porcentaje_gasto, 1))
+    # ----------------------------------------------------------------
+    # 2. PROMEDIOS GENERALES DE LOS ANÁLISIS REALIZADOS
+
+    st.subheader("Promedios sobre los análisis realizados")
+
+    estadisticas_analisis = obtener_estadisticas_analisis()
+
+    if estadisticas_analisis["cantidad_analisis"] == 0:
+        st.info(
+            "Todavía no se generó ningún análisis completo en el sistema "
+            "(esto se registra cuando un usuario aprieta 'Generar análisis').")
+
+    else:
+        cantidad_analisis = estadisticas_analisis["cantidad_analisis"]
+        promedio_ingreso = estadisticas_analisis["promedio_ingreso"]
+        promedio_gasto_total = estadisticas_analisis["promedio_gasto_total"]
+        promedio_porcentaje_gasto = estadisticas_analisis["promedio_porcentaje_gasto"]
+        promedio_cantidad_medicamentos = estadisticas_analisis["promedio_cantidad_medicamentos"]
+
+        st.caption(f"Calculado sobre {cantidad_analisis} análisis generados hasta ahora.")
+
+        columna_1, columna_2, columna_3, columna_4 = st.columns(4)
+
+        with columna_1:
+            st.metric("Ingreso promedio", f"${promedio_ingreso:,.0f}")
+
+        with columna_2:
+            st.metric("Gasto promedio en medicamentos", f"${promedio_gasto_total:,.0f}")
+
+        with columna_3:
+            st.metric("% promedio del ingreso gastado", f"{promedio_porcentaje_gasto:.1f}%")
+
+        with columna_4:
+            st.metric("Medicamentos promedio por consulta", f"{promedio_cantidad_medicamentos:.1f}")
 
         st.markdown(
             f"""
-            <div style="
-                background-color:{COLOR_ORANGE};
-                border-radius:10px;
-                height:38px;
-                width:100%;
-                overflow:hidden;
-                margin-top:0.4rem;
-                margin-bottom:0.6rem;">
-                <div style="
-                    background-color:{COLOR_NAVY};
-                    height:100%;
-                    width:{porcentaje_gasto_barra * 100}%;
-                    border-radius:10px 0 0 10px;">
-                </div>
+            <div class="caja-presentacion" style="font-size:18px !important; margin-top:1.5rem;">
+                En promedio, los usuarios que generaron un análisis en este sistema destinan el
+                <strong>{promedio_porcentaje_gasto:.1f}%</strong> de su ingreso jubilatorio a medicamentos,
+                con un gasto promedio de <strong>${promedio_gasto_total:,.0f}</strong> sobre un ingreso
+                promedio informado de <strong>${promedio_ingreso:,.0f}</strong>.
             </div>
             """,
             unsafe_allow_html=True
         )
-
-        st.write(
-            f"Medicamentos ({cantidad}): ${gasto:,.2f}  |  "
-            f"Saldo restante: ${saldo:,.2f}  |  "
-            f"{porcentaje_gasto * 100:.2f}% del ingreso"
-        )
-
-        st.subheader("Posibles beneficios o trámites a consultar")
-        st.write(resultado["mensaje_beneficios"])
-        
-        
-# ==========================================================
-# GENERAR PDF INFORMATIVO FINAL
-
-        ruta_pdf = generar_pdf_resumen(resumen=resultado["resumen"],
-                                       df_medicamentos=df_meds_seleccionados,
-                                       df_agencias=df_agencias_seleccionadas,
-                                       mensaje_beneficios=resultado["mensaje_beneficios"],
-                                       enfermedad_seleccionada=enfermedad_seleccionada,
-                                       mes_aguinaldo=mes_aguinaldo,
-                                       nombre_archivo="resumen_pami_streamlit.pdf")
-
-        with open(ruta_pdf, "rb") as archivo_pdf:
-            st.download_button(label="Descargar PDF",
-                               data=archivo_pdf,
-                               file_name="resumen_pami.pdf",
-                               mime="application/pdf")
