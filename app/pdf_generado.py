@@ -67,6 +67,30 @@ def formatear_pesos(valor):
     return f"${valor:,.2f}"
 
 
+def escribir_multicell_completo(pdf, alto, texto):
+    """
+    Escribe un multi_cell() de ancho completo (de margen a margen),
+    garantizando primero que el cursor esté ubicado en el margen
+    izquierdo.
+
+    Por qué existe esta función:
+    Distintas versiones de la librería fpdf2 difieren en si, al
+    terminar un multi_cell(), el cursor X vuelve solo al margen
+    izquierdo o queda ubicado más a la derecha (cerca del borde de la
+    última línea escrita). Si se encadenan dos multi_cell(0, ...) sin
+    resetear la posición, el segundo puede calcular un ancho
+    disponible casi nulo y lanzar FPDFException
+    ("Not enough horizontal space to render a single character").
+
+    Llamando siempre a pdf.set_x(pdf.l_margin) antes de cada
+    multi_cell de ancho completo, este comportamiento queda fijo sin
+    importar la versión de fpdf2 instalada.
+    """
+
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(0, alto, texto)
+
+
 # 5. CLASE PERSONALIZADA DEL PDF
 
 class PDFResumenPAMI(FPDF):
@@ -323,6 +347,10 @@ def agregar_agencias(pdf, df_agencias):
                      border=0, align="C", fill=True)
 
             # Nombre de la agencia.
+            # IMPORTANTE: acá se usa set_xy() (no set_x()) antes de cada
+            # multi_cell porque las tarjetas van en columnas angostas
+            # (ancho_columna), no de margen a margen. Cada multi_cell
+            # necesita su propia coordenada X explícita (x, no l_margin).
             pdf.set_xy(x, y_inicio_fila + 8)
             pdf.set_text_color(*COLOR_NAVY)
             pdf.set_font("Arial", "B", 10)
@@ -359,6 +387,13 @@ def agregar_item_alerta(pdf, titulo, mensaje):
 
     Se controla que el título de la alerta no quede separado de su
     desarrollo si justo cae al final de una página.
+
+    Ambos multi_cell se escriben con escribir_multicell_completo(),
+    que fuerza el cursor al margen izquierdo antes de escribir. Esto
+    evita el error "Not enough horizontal space to render a single
+    character", que aparece cuando fpdf2 no resetea el cursor X al
+    margen izquierdo después de un multi_cell(0, ...) (el
+    comportamiento exacto varía según la versión de la librería).
     """
 
     # Estimamos que un ítem ocupa al menos el título + 2 líneas de texto.
@@ -366,11 +401,11 @@ def agregar_item_alerta(pdf, titulo, mensaje):
 
     pdf.set_font("Arial", "B", 10.5)
     pdf.set_text_color(*COLOR_NAVY)
-    pdf.multi_cell(0, 7, limpiar_texto_pdf(titulo))
+    escribir_multicell_completo(pdf, 7, limpiar_texto_pdf(titulo))
 
     pdf.set_font("Arial", "", 10)
     pdf.set_text_color(*COLOR_BLACK)
-    pdf.multi_cell(0, 6.5, limpiar_texto_pdf(mensaje))
+    escribir_multicell_completo(pdf, 6.5, limpiar_texto_pdf(mensaje))
 
     pdf.ln(4)
 
@@ -403,14 +438,14 @@ def agregar_beneficios(pdf, alertas_beneficios=None, mensaje_beneficios=None, en
 
     enfermedad = limpiar_texto_pdf(enfermedad_seleccionada)
 
-    pdf.multi_cell(0, 7, f"Enfermedad o condicion informada por el usuario: {enfermedad}")
+    escribir_multicell_completo(pdf, 7, f"Enfermedad o condicion informada por el usuario: {enfermedad}")
     pdf.ln(3)
 
     # Aclaración general: el sistema es orientativo y las gestiones se
     # confirman en la agencia PAMI seleccionada.
     pdf.set_font("Arial", "I", 9.5)
     pdf.set_text_color(*COLOR_SLATE)
-    pdf.multi_cell(0, 6, limpiar_texto_pdf(
+    escribir_multicell_completo(pdf, 6, limpiar_texto_pdf(
         "Las siguientes alertas son orientativas y no implican aprobacion automatica de ningun beneficio. "
         "Para confirmar requisitos e iniciar los tramites, acerquese a una de las agencias PAMI seleccionadas."))
     pdf.set_text_color(*COLOR_BLACK)
@@ -431,13 +466,13 @@ def agregar_beneficios(pdf, alertas_beneficios=None, mensaje_beneficios=None, en
     elif mensaje_beneficios:
         texto_sin_markdown = mensaje_beneficios.replace("**", "")
         pdf.set_font("Arial", "", 10)
-        pdf.multi_cell(0, 7, limpiar_texto_pdf(texto_sin_markdown))
+        escribir_multicell_completo(pdf, 7, limpiar_texto_pdf(texto_sin_markdown))
         pdf.ln(4)
 
     # No hay alertas ni mensaje: se avisa que no se detectó nada especial.
     else:
         pdf.set_font("Arial", "", 10)
-        pdf.multi_cell(0, 7, limpiar_texto_pdf(
+        escribir_multicell_completo(pdf, 7, limpiar_texto_pdf(
             "No se detectaron alertas automaticas de beneficios adicionales segun los datos ingresados. De "
             "todos modos, la cobertura real puede variar segun la situacion particular del afiliado y las "
             "autorizaciones vigentes de PAMI."))
@@ -472,7 +507,7 @@ def agregar_mensaje_final(pdf, mes_aguinaldo=False):
             "el calculo del gasto en medicamentos ni las alertas de beneficios.")
 
         pdf.set_font("Arial", "B", 10)
-        pdf.multi_cell(0, 7, limpiar_texto_pdf(texto_aguinaldo))
+        escribir_multicell_completo(pdf, 7, limpiar_texto_pdf(texto_aguinaldo))
         pdf.set_font("Arial", "", 10)
         pdf.ln(2)
 
@@ -482,7 +517,7 @@ def agregar_mensaje_final(pdf, mes_aguinaldo=False):
         "Para confirmar requisitos, cobertura, empadronamientos o tramites, se recomienda consultar en la "
         "agencia PAMI seleccionada.")
 
-    pdf.multi_cell(0, 7, limpiar_texto_pdf(texto))
+    escribir_multicell_completo(pdf, 7, limpiar_texto_pdf(texto))
 
 
 # 12. GENERAR PDF FINAL
