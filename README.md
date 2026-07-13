@@ -51,7 +51,8 @@ El proyecto se encuentra organizado de manera modular.
 | `pdf_generado.py` | Construcción del informe PDF para el usuario. |
 | `streamlit_app.py` | Interfaz gráfica del sistema. |
 | `cargar_datos.py` | Carga y administración de datasets. |
-| `scraping_precios_actualizados.py` | Comapracion de precios de medicamentos entre el dataset oficial de Pami y el de mercado. |
+| `scraping_precios_actualizados.py` | Comparacion de precios de medicamentos entre el dataset oficial de Pami y el de mercado. |
+| `scraping_valores_previsionales.py` | Extracción de valores de jubilación mínima y bono previsional. |
 
 ---
 
@@ -64,9 +65,6 @@ La aplicación utiliza información proveniente de organismos oficiales.
 - Dataset de Centros de Jubilados.
 - Índice de Precios al Consumidor (INDEC).
 - Dataset propio de actualización jubilatoria.
-
-Además, se encuentra prevista la incorporación de:
-
 - Scraping de jubilación mínima desde fuentes oficiales.
 ---
 
@@ -93,8 +91,8 @@ Además, se encuentra prevista la incorporación de:
 | Beneficios | Finalizado |
 | Análisis económico | Finalizado |
 | Generación de PDF | Finalizado |
-| Aplicación Streamlit | En desarrollo avanzado |
-| Scraping de jubilación mínima | Pendiente |
+| Aplicación Streamlit | En proceso avanzado |
+| Scraping de jubilación mínima | Finalizado |
 | Scraping de precios de medicamentos | Finalizado |
 
 ---
@@ -103,7 +101,6 @@ Además, se encuentra prevista la incorporación de:
 
 Entre las funcionalidades previstas para futuras versiones se encuentran:
 
-- Incorporación de scraping automático de jubilación mínima.
 - Publicación online mediante Streamlit Cloud.
 
 ---
