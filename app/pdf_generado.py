@@ -267,8 +267,16 @@ def agregar_medicamentos(pdf, df_medicamentos):
         pdf.ln(6)
         return
 
-    anchos = [45, 50, 35, 40]
-    encabezados = ["DROGA", "MARCA", "COBERTURA", "A PAGAR"]
+    # Los anchos se calculan como proporción del ancho útil de la página
+    # (en vez de valores fijos en mm) para que la tabla siempre ocupe
+    # todo el espacio disponible, sin importar el tamaño de página.
+    ancho_util = pdf.w - pdf.l_margin - pdf.r_margin
+
+    proporciones = [0.20, 0.24, 0.20, 0.16, 0.20]
+    # DROGA, MARCA, PRESENTACION, COBERTURA, A PAGAR
+
+    anchos = [ancho_util * proporcion for proporcion in proporciones]
+    encabezados = ["DROGA", "MARCA", "PRESENTACION", "COBERTURA", "A PAGAR"]
 
     # Encabezado de la tabla: fondo de color, texto centrado, negrita y mayúscula.
     pdf.set_font("Arial", "B", 9)
@@ -284,15 +292,17 @@ def agregar_medicamentos(pdf, df_medicamentos):
     pdf.set_text_color(*COLOR_BLACK)
 
     for _, fila in df_medicamentos.iterrows():
-        droga = limpiar_texto_pdf(fila.get("DROGA", ""))[:25]
-        marca = limpiar_texto_pdf(fila.get("MARCA", ""))[:28]
+        droga = limpiar_texto_pdf(fila.get("DROGA", ""))[:22]
+        marca = limpiar_texto_pdf(fila.get("MARCA", ""))[:24]
+        presentacion = limpiar_texto_pdf(fila.get("PRESENTACION", ""))[:18]
         cobertura = limpiar_texto_pdf(fila.get("COBERTURA", ""))
         a_pagar = formatear_pesos(float(fila.get("A_PAGAR", 0)))
 
-        pdf.cell(45, 8, droga, border=1)
-        pdf.cell(50, 8, marca, border=1)
-        pdf.cell(35, 8, cobertura, border=1, align="C")
-        pdf.cell(40, 8, a_pagar, border=1, align="R")
+        pdf.cell(anchos[0], 8, droga, border=1)
+        pdf.cell(anchos[1], 8, marca, border=1)
+        pdf.cell(anchos[2], 8, presentacion, border=1, align="C")
+        pdf.cell(anchos[3], 8, cobertura, border=1, align="C")
+        pdf.cell(anchos[4], 8, a_pagar, border=1, align="R")
         pdf.ln()
 
     pdf.ln(6)
