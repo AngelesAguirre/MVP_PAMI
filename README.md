@@ -8,6 +8,8 @@ Este proyecto desarrolla una aplicación destinada a asistir a jubilados y pensi
 
 La aplicación se encuentra desarrollada en Python y actualmente cuenta con una interfaz web construida mediante Streamlit.
 
+https://consultatusmedicamentos-pami.streamlit.app/
+
 ---
 
 # Información general
@@ -91,7 +93,7 @@ La aplicación utiliza información proveniente de organismos oficiales.
 | Beneficios | Finalizado |
 | Análisis económico | Finalizado |
 | Generación de PDF | Finalizado |
-| Aplicación Streamlit | En proceso avanzado |
+| Aplicación Streamlit | Finalizado |
 | Scraping de jubilación mínima | Finalizado |
 | Scraping de precios de medicamentos | Finalizado |
 
